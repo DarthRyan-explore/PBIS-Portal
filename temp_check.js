@@ -378,55 +378,55 @@
         name: "Bronze Arrowhead",
         requirement: "1 pt",
         tagline: "Congratulations, you earned your first point! Who says old dogs can't learn new tricks.",
-        img: "/Users/elise/.gemini/antigravity/brain/5db8a2a9-9a0b-4e86-b3fe-46c059be3dae/arrowhead_bronze_1779573390419.png"
+        img: "assets/arrowhead_bronze_1779573390419.png"
       },
       silver: {
         name: "Silver Arrowhead",
         requirement: "3 pts",
         tagline: "Three points! Look at you go. Rumor has it the superintendent is personally drafting a thank you letter. (They aren't, but still, good job!)",
-        img: "/Users/elise/.gemini/antigravity/brain/5db8a2a9-9a0b-4e86-b3fe-46c059be3dae/arrowhead_silver_1779573411718.png"
+        img: "assets/arrowhead_silver_1779573411718.png"
       },
       gold: {
         name: "Gold Arrowhead",
         requirement: "5 pts",
         tagline: "Five points! You're on fire! We hope you have a fire extinguisher nearby.",
-        img: "/Users/elise/.gemini/antigravity/brain/5db8a2a9-9a0b-4e86-b3fe-46c059be3dae/arrowhead_gold_1779573431368.png"
+        img: "assets/arrowhead_gold_1779573431368.png"
       },
       obsidian: {
         name: "Obsidian Arrowhead",
         requirement: "10 pts",
         tagline: "Ten points! Double digits! You're officially a Copley Champion. Don't let all this power go to your head.",
-        img: "/Users/elise/.gemini/antigravity/brain/5db8a2a9-9a0b-4e86-b3fe-46c059be3dae/arrowhead_obsidian_1779573453926.png"
+        img: "assets/arrowhead_obsidian_1779573453926.png"
       },
       ruby: {
         name: "Ruby Arrowhead",
         requirement: "20 pts",
         tagline: "Twenty points! You've officially entered the upper echelon of CHS champions. Rumor has it the principal is jealous.",
-        img: "/Users/elise/.gemini/antigravity/brain/5db8a2a9-9a0b-4e86-b3fe-46c059be3dae/arrowhead_ruby_1780057236590.png"
+        img: "assets/arrowhead_ruby_1780057236590.png"
       },
       diamond: {
         name: "Diamond Arrowhead",
         requirement: "30 pts",
         tagline: "Thirty points! Shining brighter than a diamond. Copley's own MVP of support.",
-        img: "/Users/elise/.gemini/antigravity/brain/5db8a2a9-9a0b-4e86-b3fe-46c059be3dae/arrowhead_diamond_1780057251053.png"
+        img: "assets/arrowhead_diamond_1780057251053.png"
       },
       sapphire: {
         name: "Sapphire Arrowhead",
         requirement: "40 pts",
         tagline: "Forty points! The hall of fame is currently calling. They want to know if you prefer gold or marble for your bust.",
-        img: "/Users/elise/.gemini/antigravity/brain/5db8a2a9-9a0b-4e86-b3fe-46c059be3dae/arrowhead_sapphire_1780057263907.png"
+        img: "assets/arrowhead_sapphire_1780057263907.png"
       },
       prismatic: {
         name: "Ultimate Prismatic Arrowhead",
         requirement: "50 pts",
         tagline: "Fifty points! Ultimate Copley Legend. You have officially beaten the game of encouragement. Go get some coffee!",
-        img: "/Users/elise/.gemini/antigravity/brain/5db8a2a9-9a0b-4e86-b3fe-46c059be3dae/arrowhead_prismatic_1780057277204.png"
+        img: "assets/arrowhead_prismatic_1780057277204.png"
       },
       mtss: {
         name: "MTSS Crystal Arrowhead",
         requirement: "3 Support Logs",
         tagline: "Supporting student growth one check-in at a time. Psychologist Denise Polak nods in approval.",
-        img: "/Users/elise/.gemini/antigravity/brain/5db8a2a9-9a0b-4e86-b3fe-46c059be3dae/arrowhead_mtss_1779573475660.png"
+        img: "assets/arrowhead_mtss_1779573475660.png"
       }
     };
 
