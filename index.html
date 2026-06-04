@@ -581,6 +581,33 @@
       opacity: 0.12 !important;
     }
 
+    /* Custom Avatar Clip-path Shapes */
+    .avatar-shape-circle {
+      border-radius: 9999px !important;
+      clip-path: none !important;
+    }
+    .avatar-shape-square {
+      border-radius: 12px !important;
+      clip-path: none !important;
+    }
+    .avatar-shape-shield {
+      border-radius: 0px !important;
+      clip-path: polygon(50% 0%, 100% 20%, 90% 75%, 50% 100%, 10% 75%, 0% 20%) !important;
+    }
+    .avatar-shape-arrowhead {
+      border-radius: 0px !important;
+      clip-path: polygon(50% 0%, 100% 70%, 75% 65%, 50% 100%, 25% 65%, 0% 70%) !important;
+    }
+
+    /* Monogram Text Glow Colors */
+    .monogram-white { color: #ffffff !important; text-shadow: 0 0 4px rgba(255, 255, 255, 0.6) !important; }
+    .monogram-gold { color: #ffcc04 !important; text-shadow: 0 0 5px rgba(255, 204, 4, 0.8) !important; }
+    .monogram-navy { color: #0c2346 !important; text-shadow: 0 0 3px rgba(255, 255, 255, 0.8), 0 0 1px rgba(255, 255, 255, 0.9) !important; }
+    .monogram-cyan { color: #22d3ee !important; text-shadow: 0 0 6px rgba(34, 211, 238, 0.85) !important; }
+    .monogram-magenta { color: #f43f5e !important; text-shadow: 0 0 6px rgba(244, 63, 94, 0.85) !important; }
+    .monogram-lime { color: #a3e635 !important; text-shadow: 0 0 6px rgba(163, 230, 53, 0.85) !important; }
+    .monogram-charcoal { color: #0f172a !important; text-shadow: 0 0 3px rgba(255, 255, 255, 0.8), 0 0 1px rgba(255, 255, 255, 0.9) !important; }
+
     /* Floating Repeat Emoji Backdrop Wallpaper Grid */
     .emoji-backdrop-grid {
       position: absolute;
@@ -1485,55 +1512,51 @@
           // Seed Data Mappings from the PDF
           const SEED_CASELOAD = [
             {
-              student: "Cole, G.",
+              student: "Gamgee, S.",
               teacher: "Lee Malcolm",
               class: "Algebra II",
               mod: "Period 3",
               referralSource: "Ohio SB8 letter grade shift concern",
-              link: "https://docs.google.com/spreadsheets/d/1_mX-6qppTQ8dtk9xgXExAfvJ-X7lnevs7eY3stuodHk/edit?gid=1537025129#gid=1537025129",
               completed: false
             },
             {
-              student: "Horak, L.",
+              student: "Skywalker, A.",
               teacher: "Lee Malcolm",
               class: "English 11",
               mod: "Period 1",
               referralSource: "Missing assignments and disengagement",
-              link: "https://docs.google.com/spreadsheets/d/1Ntm_7s5zRmxsCTG0mEAust_qeSpLt57hg4uNQrA7pvM/edit?gid=828776153#gid=828776153",
               completed: false
             },
             {
-              student: "Al-Maflehi, H.",
+              student: "Maximoff, W.",
               teacher: "Maggie Steffen",
               class: "Chemistry II",
               mod: "Period 4",
               referralSource: "Ohio SB8 concurrent Tier 2/3 overlap",
-              link: "https://docs.google.com/spreadsheets/d/1qmeYKz53XQ4kI791KGLYQ4kDoskBsAAxU8GEKWfAORE/edit?gid=1791084589#gid=1791084589",
               completed: false
             },
             {
-              student: "Alsmairat, K.",
+              student: "Parker, P.",
               teacher: "Maggie Steffen",
               class: "History",
               mod: "Period 2",
               referralSource: "Ohio SB8 letter grade shift concern",
-              link: "https://docs.google.com/spreadsheets/d/1F8D7LIXOXqHIqdMa1HznM1zIvPg4cR4ACEaXf-bJZf8/edit?gid=379347432#gid=379347432",
               completed: false
             },
             {
-              student: "Graf, R.",
+              student: "Baggins, F.",
               teacher: "Maggie Steffen",
               class: "Biology",
               mod: "Period 6",
               referralSource: "Ohio SB8 frequent flex support requests",
-              link: "https://docs.google.com/spreadsheets/d/1_KX5lzq9aVvbXfd2XIgYa-dMdiQIjqhab57R3JHR6V8/edit?gid=1238113764#gid=1238113764",
               completed: false
             }
           ];
 
-          // Initialize Database
+          // Initialize Database (invalidates cache if old real student initials present)
           function initMTSSDatabase() {
-            if (!localStorage.getItem('AppState_mtssCaseload')) {
+            const cached = localStorage.getItem('AppState_mtssCaseload');
+            if (!cached || cached.includes("Cole, G.")) {
               localStorage.setItem('AppState_mtssCaseload', JSON.stringify(SEED_CASELOAD));
             }
           }
@@ -1543,6 +1566,60 @@
             initMTSSDatabase();
             return JSON.parse(localStorage.getItem('AppState_mtssCaseload') || '[]');
           }
+
+          let activeMockMTSSStudent = '';
+
+          window.openMockGoogleSheet = function(studentName, className) {
+            playSynthClick();
+            activeMockMTSSStudent = studentName;
+            
+            const studentLabel = document.getElementById('mtssMockStudentName');
+            if (studentLabel) studentLabel.innerText = studentName;
+            
+            const classLabel = document.getElementById('mtssMockClass');
+            if (classLabel) classLabel.innerText = className;
+            
+            const notesField = document.getElementById('mtssMockNotes');
+            if (notesField) notesField.value = '';
+
+            const modal = document.getElementById('mockMTSSSheetModal');
+            if (modal) {
+              modal.classList.remove('hidden');
+              modal.offsetHeight; // force reflow
+              modal.classList.remove('opacity-0');
+              modal.classList.add('opacity-100');
+              const card = modal.querySelector('div');
+              if (card) {
+                card.classList.remove('scale-95');
+                card.classList.add('scale-100');
+              }
+            }
+          };
+
+          window.closeMockMTSSSheetModal = function() {
+            playSynthClick();
+            const modal = document.getElementById('mockMTSSSheetModal');
+            if (modal) {
+              const card = modal.querySelector('div');
+              if (card) {
+                card.classList.remove('scale-100');
+                card.classList.add('scale-95');
+              }
+              modal.classList.remove('opacity-100');
+              modal.classList.add('opacity-0');
+              setTimeout(() => {
+                modal.classList.add('hidden');
+              }, 300);
+            }
+          };
+
+          window.submitMockStrategyUpdate = function() {
+            if (!activeMockMTSSStudent) return;
+            showToast("Intervention Logged! 📊", `Saved strategy implementation notes for ${activeMockMTSSStudent}.`);
+            playSynthSuccess();
+            toggleMTSSComplete(activeMockMTSSStudent, true);
+            closeMockMTSSSheetModal();
+          };
 
           // Save All Caseload Data
           function saveMTSSCaseload(data) {
@@ -1657,10 +1734,10 @@
                     </div>
 
                     <div class="mt-5 pt-3.5 border-t border-slate-100 flex items-center justify-between gap-3">
-                      <a href="${c.link}" target="_blank" class="flex-grow bg-copley-blue hover:opacity-95 text-copley-gold border-2 border-white hover:border-copley-gold font-black text-[10px] px-3.5 py-3 rounded-xl transition uppercase text-center shadow-sm active:scale-98 flex items-center justify-center gap-1.5 heading-style select-none tracking-widest">
-                        <span>Open Google Sheet</span>
-                        <i class="fa-solid fa-external-link text-[9px] animate-pulse"></i>
-                      </a>
+                      <button onclick="openMockGoogleSheet('${c.student}', '${c.class}')" class="flex-grow bg-copley-blue hover:opacity-95 text-copley-gold border border-slate-205 font-bold text-[10px] px-3.5 py-3 rounded-xl transition uppercase text-center shadow-sm active:scale-98 flex items-center justify-center gap-1.5 heading-style select-none tracking-widest">
+                        <span>Open Strategy Sheet</span>
+                        <i class="fa-solid fa-clipboard-list text-[9px]"></i>
+                      </button>
                       <button onclick="toggleMTSSComplete('${c.student}', true)" class="bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[10px] px-4 py-3 rounded-xl border border-emerald-500 hover:border-emerald-400 transition uppercase tracking-widest active:scale-98 flex items-center gap-1 shrink-0 heading-style">
                         <i class="fa-solid fa-check"></i>
                         <span>Done</span>
@@ -1705,34 +1782,31 @@
           // Seed Data Mappings from the C&C PDF
           const SEED_CC = [
             {
-              student: "Poole, D.",
+              student: "Skywalker, L.",
               teacher: "Tom Wilson",
-              link: "https://docs.google.com/forms/d/1efIf9Es7bCHn-ao2gL7maoGNIPUNQNUXyKjQeVk-N9U/preview",
               completed: false
             },
             {
-              student: "Hull, A.",
+              student: "Stacy, G.",
               teacher: "Kim Carothers",
-              link: "https://docs.google.com/forms/d/1efIf9Es7bCHn-ao2gL7maoGNIPUNQNUXyKjQeVk-N9U/preview",
               completed: false
             },
             {
-              student: "Kovesi, K.",
+              student: "Organa, L.",
               teacher: "Maggie Zook",
-              link: "https://docs.google.com/forms/d/1efIf9Es7bCHn-ao2gL7maoGNIPUNQNUXyKjQeVk-N9U/preview",
               completed: false
             },
             {
-              student: "Meyer, J.",
+              student: "Solo, H.",
               teacher: "Tim Oden",
-              link: "https://docs.google.com/forms/d/1efIf9Es7bCHn-ao2gL7maoGNIPUNQNUXyKjQeVk-N9U/preview",
               completed: false
             }
           ];
 
-          // Initialize Database
+          // Initialize Database (invalidates cache if old real student initials present)
           function initCCDatabase() {
-            if (!localStorage.getItem('AppState_ccCaseload')) {
+            const cached = localStorage.getItem('AppState_ccCaseload');
+            if (!cached || cached.includes("Poole, D.")) {
               localStorage.setItem('AppState_ccCaseload', JSON.stringify(SEED_CC));
             }
           }
@@ -1742,6 +1816,57 @@
             initCCDatabase();
             return JSON.parse(localStorage.getItem('AppState_ccCaseload') || '[]');
           }
+
+          let activeMockCCStudent = '';
+
+          window.openMockCCForm = function(studentName) {
+            playSynthClick();
+            activeMockCCStudent = studentName;
+            
+            const studentLabel = document.getElementById('ccMockStudentName');
+            if (studentLabel) studentLabel.innerText = studentName;
+            
+            const notesField = document.getElementById('ccMockNotes');
+            if (notesField) notesField.value = '';
+
+            const modal = document.getElementById('mockCCFormModal');
+            if (modal) {
+              modal.classList.remove('hidden');
+              modal.offsetHeight; // force reflow
+              modal.classList.remove('opacity-0');
+              modal.classList.add('opacity-100');
+              const card = modal.querySelector('div');
+              if (card) {
+                card.classList.remove('scale-95');
+                card.classList.add('scale-100');
+              }
+            }
+          };
+
+          window.closeMockCCFormModal = function() {
+            playSynthClick();
+            const modal = document.getElementById('mockCCFormModal');
+            if (modal) {
+              const card = modal.querySelector('div');
+              if (card) {
+                card.classList.remove('scale-100');
+                card.classList.add('scale-95');
+              }
+              modal.classList.remove('opacity-100');
+              modal.classList.add('opacity-0');
+              setTimeout(() => {
+                modal.classList.add('hidden');
+              }, 300);
+            }
+          };
+
+          window.submitMockCCFormUpdate = function() {
+            if (!activeMockCCStudent) return;
+            showToast("Weekly Mentor Checklist Saved! 🛡️", `Meeting details for ${activeMockCCStudent} logged.`);
+            playSynthSuccess();
+            toggleCCComplete(activeMockCCStudent, true);
+            closeMockCCFormModal();
+          };
 
           // Save All Caseload Data
           function saveCCCaseload(data) {
@@ -1855,10 +1980,10 @@
                     </div>
 
                     <div class="mt-5 pt-3.5 border-t border-slate-100 flex items-center justify-between gap-3">
-                      <a href="${c.link}" target="_blank" class="flex-grow bg-copley-blue hover:opacity-95 text-copley-gold border-2 border-white hover:border-copley-gold font-black text-[10px] px-3.5 py-3 rounded-xl transition uppercase text-center shadow-sm active:scale-98 flex items-center justify-center gap-1.5 heading-style select-none tracking-widest font-bold">
-                        <span>Open C&C Check-In Form</span>
-                        <i class="fa-solid fa-external-link text-[9px] animate-pulse"></i>
-                      </a>
+                      <button onclick="openMockCCForm('${c.student}')" class="flex-grow bg-copley-blue hover:opacity-95 text-copley-gold border border-slate-205 font-bold text-[10px] px-3.5 py-3 rounded-xl transition uppercase text-center shadow-sm active:scale-98 flex items-center justify-center gap-1.5 heading-style select-none tracking-widest font-bold">
+                        <span>Open Mentor Checklist</span>
+                        <i class="fa-solid fa-clipboard-check text-[9px]"></i>
+                      </button>
                       <button onclick="toggleCCComplete('${c.student}', true)" class="bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[10px] px-4 py-3 rounded-xl border border-emerald-500 hover:border-emerald-400 transition uppercase tracking-widest active:scale-98 flex items-center gap-1 shrink-0 heading-style">
                         <i class="fa-solid fa-check"></i>
                         <span>Done</span>
@@ -1907,15 +2032,16 @@
           
           <div class="absolute -right-24 -top-24 w-48 h-48 bg-copley-gold/10 rounded-full blur-3xl pointer-events-none"></div>
           
-          <!-- Student Avatar with Glowing Upgrade Border -->
           <div class="relative w-24 h-24 mx-auto mb-1 flex items-center justify-center">
-            <!-- Glowing border background -->
-            <div id="studentDashboardAvatarGlow" class="absolute inset-0 rounded-full transition-all duration-300"></div>
-            <!-- Main Avatar Circle -->
-            <div id="studentDashboardAvatarContainer" class="w-20 h-20 bg-copley-blue text-copley-gold font-serif font-black text-3xl rounded-full flex items-center justify-center border-2 border-white shadow-md relative group select-none transition-all duration-300 z-10">
-              <span id="studentDashboardLetter">F</span>
-              <!-- Unlocked Avatar Icon (defaults hidden) -->
-              <i id="studentDashboardAvatarIcon" class="fa-solid fa-user-graduate hidden text-2xl"></i>
+            <!-- Glow wrapper -->
+            <div id="studentDashboardAvatarGlowWrapper" class="relative transition-all duration-300">
+              <!-- Outer boundary (White border) -->
+              <div id="studentDashboardAvatarOuter" class="w-20 h-20 bg-white p-[2px] transition-all duration-300">
+                <!-- Inner container (Gradient bg) -->
+                <div id="studentDashboardAvatarInner" class="w-full h-full flex items-center justify-center relative select-none transition-all duration-300">
+                  <span id="studentDashboardLetter" class="z-10 select-none">F</span>
+                </div>
+              </div>
             </div>
           </div>
           
@@ -3041,10 +3167,15 @@
           
           <!-- Live Preview Avatar -->
           <div class="relative w-24 h-24 my-4 flex items-center justify-center z-10">
-            <div id="previewAvatarGlow" class="absolute inset-0 rounded-full transition-all duration-300"></div>
-            <div id="previewAvatarContainer" class="w-20 h-20 bg-copley-blue text-copley-gold font-serif font-black text-3xl rounded-full flex items-center justify-center border-2 border-white shadow-md relative select-none transition-all duration-300">
-              <span id="previewLetter">F</span>
-              <i id="previewAvatarIcon" class="fa-solid fa-user-graduate hidden text-2xl"></i>
+            <!-- Glow wrapper -->
+            <div id="previewAvatarGlowWrapper" class="relative transition-all duration-300">
+              <!-- Outer boundary (White border) -->
+              <div id="previewAvatarOuter" class="w-20 h-20 bg-white p-[2px] transition-all duration-300">
+                <!-- Inner container (Gradient bg) -->
+                <div id="previewAvatarInner" class="w-full h-full flex items-center justify-center relative select-none transition-all duration-300">
+                  <span id="previewLetter" class="z-10 select-none">F</span>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -3064,17 +3195,20 @@
         <div class="md:col-span-7 flex flex-col gap-4">
           
           <!-- Selector Tabs -->
-          <div class="flex bg-slate-200 p-1 rounded-xl shadow-inner border border-slate-200/40 font-bold text-[9px] select-none">
-            <button onclick="switchCustomizerTab('avatar')" id="custTab-avatar" class="flex-grow bg-white text-copley-blue px-2.5 py-1.5 rounded-lg shadow-sm font-black uppercase text-center transition-all">
-              Avatars
+          <div class="flex bg-slate-200 p-1 rounded-xl shadow-inner border border-slate-200/40 font-bold text-[8.5px] select-none gap-0.5">
+            <button onclick="switchCustomizerTab('shape-bg')" id="custTab-shape-bg" class="flex-grow bg-white text-copley-blue px-2 py-1.5 rounded-lg shadow-sm font-black uppercase text-center transition-all">
+              Shape & Bg
             </button>
-            <button onclick="switchCustomizerTab('border')" id="custTab-border" class="flex-grow text-slate-500 hover:text-slate-700 px-2.5 py-1.5 rounded-lg font-black uppercase text-center transition-all">
+            <button onclick="switchCustomizerTab('initials-emoji')" id="custTab-initials-emoji" class="flex-grow text-slate-500 hover:text-slate-700 px-2 py-1.5 rounded-lg font-black uppercase text-center transition-all">
+              Initials & Emoji
+            </button>
+            <button onclick="switchCustomizerTab('border')" id="custTab-border" class="flex-grow text-slate-500 hover:text-slate-700 px-2 py-1.5 rounded-lg font-black uppercase text-center transition-all">
               Glow Borders
             </button>
-            <button onclick="switchCustomizerTab('title')" id="custTab-title" class="flex-grow text-slate-500 hover:text-slate-700 px-2.5 py-1.5 rounded-lg font-black uppercase text-center transition-all">
+            <button onclick="switchCustomizerTab('title')" id="custTab-title" class="flex-grow text-slate-500 hover:text-slate-700 px-2 py-1.5 rounded-lg font-black uppercase text-center transition-all">
               Titles
             </button>
-            <button onclick="switchCustomizerTab('theme')" id="custTab-theme" class="flex-grow text-slate-500 hover:text-slate-700 px-2.5 py-1.5 rounded-lg font-black uppercase text-center transition-all">
+            <button onclick="switchCustomizerTab('theme')" id="custTab-theme" class="flex-grow text-slate-500 hover:text-slate-700 px-2 py-1.5 rounded-lg font-black uppercase text-center transition-all">
               Themes
             </button>
           </div>
@@ -3168,17 +3302,167 @@
         </div>
       </div>
 
-      <!-- Modal Footer -->
-      <div class="bg-slate-50 px-5 py-4 border-t border-slate-200 flex justify-end gap-3 shrink-0">
-        <button onclick="closeReferralModal()" class="bg-transparent hover:bg-slate-200 border border-slate-300 text-slate-500 font-bold px-4 py-2 rounded-xl transition text-xs">
-          Cancel
-        </button>
-        <button id="btnRouteReferral" class="bg-rose-600 hover:bg-rose-700 text-white font-bold px-5 py-2.5 rounded-xl transition text-xs border border-transparent shadow shadow-rose-100 flex items-center gap-1.5">
-          <i class="fa-solid fa-paper-plane"></i>
-          <span>Route Referral Payload Instantly</span>
+  </div>
+
+  <!-- ================== MODAL: MOCK MTSS STRATEGY SHEET (FERPA SANITIZED SANDBOX) ================== -->
+  <div id="mockMTSSSheetModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden opacity-0 transition-opacity duration-300">
+    <div class="bg-white border border-slate-300 max-w-xl w-full rounded-2xl shadow-2xl overflow-hidden transform scale-95 transition-transform duration-300 flex flex-col max-h-[80vh]">
+      <!-- Header -->
+      <div class="bg-copley-blue text-white px-5 py-3.5 border-b-4 border-copley-gold flex justify-between items-center font-bold text-xs heading-style shrink-0">
+        <span class="flex items-center gap-1.5 uppercase tracking-wider">
+          <i class="fa-solid fa-file-invoice text-copley-gold animate-pulse text-sm"></i>
+          <span>Tier 1 Strategy Sheet: <span id="mtssMockStudentName">Student</span></span>
+        </span>
+        <button onclick="closeMockMTSSSheetModal()" class="text-slate-400 hover:text-white text-base font-black transition-colors focus:outline-none">
+          <i class="fa-solid fa-xmark"></i>
         </button>
       </div>
 
+      <!-- Body -->
+      <div class="p-5 overflow-y-auto custom-scrollbar flex-grow space-y-4 text-xs text-slate-700 bg-slate-50">
+        <div class="bg-white border border-slate-200/80 p-3.5 rounded-xl shadow-sm">
+          <div class="grid grid-cols-2 gap-3 font-semibold text-[10px]">
+            <div><span class="text-slate-400 block uppercase">Classroom Intervention:</span> <span id="mtssMockClass" class="text-copley-blue font-black text-xs">Subject</span></div>
+            <div><span class="text-slate-400 block uppercase">Documentation Status:</span> <span class="text-rose-600 font-black flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-rose-600 animate-ping"></span> Active Monitoring</span></div>
+          </div>
+        </div>
+
+        <div class="space-y-2.5">
+          <h4 class="font-black text-slate-400 uppercase tracking-wider text-[9px] border-b border-slate-200 pb-1 flex items-center gap-1">
+            <i class="fa-solid fa-clipboard-list text-copley-blueLight"></i>
+            <span>Log Classroom Intervention Strategies</span>
+          </h4>
+          
+          <!-- Mock Table of Strategies -->
+          <div class="border border-slate-200 rounded-xl overflow-hidden shadow-sm bg-white">
+            <table class="w-full text-left border-collapse">
+              <thead>
+                <tr class="bg-slate-50 text-[8px] font-black text-slate-400 uppercase border-b border-slate-200">
+                  <th class="p-2.5">Strategy Deployed</th>
+                  <th class="p-2.5">Date</th>
+                  <th class="p-2.5">Frequency</th>
+                  <th class="p-2.5">Status</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-150 font-semibold text-[10px]">
+                <tr>
+                  <td class="p-2.5 text-slate-800">Visual Aids & Simplified Organizers</td>
+                  <td class="p-2.5 text-slate-500">2026-05-18</td>
+                  <td class="p-2.5">Daily</td>
+                  <td class="p-2.5 text-emerald-600 flex items-center gap-0.5 font-bold"><i class="fa-solid fa-circle-check"></i> Active</td>
+                </tr>
+                <tr>
+                  <td class="p-2.5 text-slate-800">Flex Support Learning Lab Check-in</td>
+                  <td class="p-2.5 text-slate-500">2026-05-20</td>
+                  <td class="p-2.5">Weekly</td>
+                  <td class="p-2.5 text-emerald-600 flex items-center gap-0.5 font-bold"><i class="fa-solid fa-circle-check"></i> Active</td>
+                </tr>
+                <tr>
+                  <td class="p-2.5 text-slate-800">Parent Homework Communication Log</td>
+                  <td class="p-2.5 text-slate-500">2026-05-22</td>
+                  <td class="p-2.5">2x / Week</td>
+                  <td class="p-2.5 text-amber-600 flex items-center gap-0.5 font-bold"><i class="fa-solid fa-hourglass-half"></i> Pending</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="space-y-1.5 mt-2">
+          <label class="block text-[9px] font-black text-slate-400 uppercase tracking-widest">Add Daily Progress/Observation Notes</label>
+          <textarea id="mtssMockNotes" rows="3" placeholder="Enter notes here about student's classroom focus, assignment catches, or flex-lab attendance..." class="w-full bg-white border border-slate-200 p-2.5 rounded-xl text-slate-800 font-semibold focus:outline-none focus:border-copley-blue text-xs shadow-inner"></textarea>
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <div class="bg-slate-50 px-5 py-3.5 border-t border-slate-200 flex justify-end gap-2.5 shrink-0">
+        <button onclick="closeMockMTSSSheetModal()" class="bg-transparent hover:bg-slate-200 border border-slate-300 text-slate-500 font-bold px-3.5 py-1.5 rounded-xl transition text-xs">
+          Close
+        </button>
+        <button onclick="submitMockStrategyUpdate()" class="bg-copley-blue hover:opacity-95 text-copley-gold border-2 border-white hover:border-copley-gold font-black text-[10px] px-4 py-2 rounded-xl transition active:scale-98 shadow-sm uppercase tracking-wider heading-style flex items-center gap-1.5">
+          <i class="fa-solid fa-cloud-arrow-up"></i>
+          <span>Save Strategy Logs</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================== MODAL: MOCK CHECK & CONNECT FORM (FERPA SANITIZED SANDBOX) ================== -->
+  <div id="mockCCFormModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden opacity-0 transition-opacity duration-300">
+    <div class="bg-white border border-slate-300 max-w-xl w-full rounded-2xl shadow-2xl overflow-hidden transform scale-95 transition-transform duration-300 flex flex-col max-h-[80vh]">
+      <!-- Header -->
+      <div class="bg-copley-blue text-white px-5 py-3.5 border-b-4 border-copley-gold flex justify-between items-center font-bold text-xs heading-style shrink-0">
+        <span class="flex items-center gap-1.5 uppercase tracking-wider">
+          <i class="fa-solid fa-list-check text-copley-gold animate-pulse text-sm"></i>
+          <span>Check & Connect Weekly Mentor Checklist: <span id="ccMockStudentName">Student</span></span>
+        </span>
+        <button onclick="closeMockCCFormModal()" class="text-slate-400 hover:text-white text-base font-black transition-colors focus:outline-none">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <!-- Body -->
+      <div class="p-5 overflow-y-auto custom-scrollbar flex-grow space-y-4 text-xs text-slate-700 bg-slate-50">
+        <div class="bg-rose-50 border border-rose-200/65 p-3.5 rounded-xl flex items-start gap-2.5 border-l-4">
+          <i class="fa-solid fa-user-shield text-rose-500 text-base mt-0.5 shrink-0 animate-pulse"></i>
+          <p class="leading-relaxed font-semibold text-[10px] text-rose-800">
+            <strong>FERPA Sandbox Mode:</strong> This form replaces external Google Forms connections with a secure, local, self-contained checklist. No student records are transmitted outside this browser environment.
+          </p>
+        </div>
+
+        <div class="space-y-4 font-semibold text-[11px] bg-white p-4 rounded-xl border border-slate-200/80 shadow-sm">
+          <!-- Question 1 -->
+          <div class="space-y-1.5">
+            <span class="text-slate-450 block uppercase tracking-wider text-[8px]">1. Did you meet with the student this week?</span>
+            <div class="flex gap-4">
+              <label class="flex items-center gap-1.5 cursor-pointer">
+                <input type="radio" name="ccMockMet" value="Yes" checked class="accent-copley-blue">
+                <span class="text-slate-700">Yes, face-to-face check-in</span>
+              </label>
+              <label class="flex items-center gap-1.5 cursor-pointer">
+                <input type="radio" name="ccMockMet" value="No" class="accent-copley-blue">
+                <span class="text-slate-700">No meeting conducted</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Question 2 -->
+          <div class="space-y-1.5">
+            <span class="text-slate-450 block uppercase tracking-wider text-[8px]">2. Focus Area discussed:</span>
+            <div class="flex flex-wrap gap-x-4 gap-y-2">
+              <label class="flex items-center gap-1.5 cursor-pointer">
+                <input type="checkbox" id="ccMockFocusAcademic" checked class="accent-copley-blue rounded">
+                <span class="text-slate-700">Academic Logs</span>
+              </label>
+              <label class="flex items-center gap-1.5 cursor-pointer">
+                <input type="checkbox" id="ccMockFocusBehavior" class="accent-copley-blue rounded">
+                <span class="text-slate-700">Behavioral Goals</span>
+              </label>
+              <label class="flex items-center gap-1.5 cursor-pointer">
+                <input type="checkbox" id="ccMockFocusAttendance" class="accent-copley-blue rounded">
+                <span class="text-slate-700">Attendance/Flex Tracker</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Question 3 -->
+          <div class="space-y-1.5 pt-2 border-t border-slate-100">
+            <label class="block text-[9px] font-black text-slate-400 uppercase tracking-widest">3. Weekly mentoring check-in notes & goals</label>
+            <textarea id="ccMockNotes" rows="3" placeholder="Enter goals established, missing assignments discussed, or check-in outcomes..." class="w-full bg-slate-50 border border-slate-200 p-2.5 rounded-xl text-slate-800 font-semibold focus:outline-none focus:border-copley-blue text-xs shadow-inner"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <div class="bg-slate-50 px-5 py-3.5 border-t border-slate-200 flex justify-end gap-2.5 shrink-0">
+        <button onclick="closeMockCCFormModal()" class="bg-transparent hover:bg-slate-200 border border-slate-300 text-slate-500 font-bold px-3.5 py-1.5 rounded-xl transition text-xs">
+          Close
+        </button>
+        <button onclick="submitMockCCFormUpdate()" class="bg-copley-blue hover:opacity-95 text-copley-gold border-2 border-white hover:border-copley-gold font-black text-[10px] px-4 py-2 rounded-xl transition active:scale-98 shadow-sm uppercase tracking-wider heading-style flex items-center gap-1.5">
+          <i class="fa-solid fa-file-circle-check"></i>
+          <span>Save Weekly Checklist</span>
+        </button>
+      </div>
     </div>
   </div>
 
@@ -4597,33 +4881,34 @@
           
           // Get equipped cosmetics for avatar, border, and title display
           const cos = AppState.studentCosmetics[std.name] || {
-            avatar: { type: "monogram", char: std.name.charAt(0), emoji: "cat", icon: "grad", font: "default", bg: "default" },
+            avatar: { type: "monogram", char: std.name.charAt(0), emoji: "cat", font: "default", bg: "default", textColor: "white", shape: "circle" },
             border: "default",
             title: "default"
           };
           const avatarDef = cos.avatar;
+          if (!avatarDef.textColor) avatarDef.textColor = "white";
+          if (!avatarDef.shape) avatarDef.shape = "circle";
           
           const avatarBgDef = CosmeticCatalog.avatarBg.find(bg => bg.id === avatarDef.bg) || CosmeticCatalog.avatarBg[0];
           const avatarEmojiDef = CosmeticCatalog.avatarEmoji.find(e => e.id === avatarDef.emoji) || CosmeticCatalog.avatarEmoji[0];
-          const avatarIconDef = CosmeticCatalog.avatarIcon.find(i => i.id === avatarDef.icon) || CosmeticCatalog.avatarIcon[0];
+          const textColorDef = CosmeticCatalog.avatarTextColor.find(c => c.id === avatarDef.textColor) || CosmeticCatalog.avatarTextColor[0];
+          const shapeDef = CosmeticCatalog.avatarShape.find(s => s.id === avatarDef.shape) || CosmeticCatalog.avatarShape[0];
           
           const borderDef = CosmeticCatalog.border.find(b => b.id === cos.border) || CosmeticCatalog.border[0];
           const titleDef = CosmeticCatalog.title.find(t => t.id === cos.title) || CosmeticCatalog.title[0];
           
           let borderMiniStyle = '';
-          if (borderDef.id === 'gold') borderMiniStyle = 'border-2 border-copley-gold shadow-[0_0_5px_rgba(255,204,4,0.7)]';
-          else if (borderDef.id === 'blue') borderMiniStyle = 'border-2 border-blue-500 shadow-[0_0_5px_rgba(59,130,246,0.7)]';
-          else if (borderDef.id === 'emerald') borderMiniStyle = 'border-2 border-emerald-500 shadow-[0_0_7px_rgba(16,185,129,0.8)]';
-          else if (borderDef.id === 'cyber') borderMiniStyle = 'border-2 border-purple-500 shadow-[0_0_8px_rgba(168,85,247,0.85)]';
-          else borderMiniStyle = 'border border-slate-350';
+          if (borderDef.id === 'gold') borderMiniStyle = 'border border-copley-gold shadow-[0_0_4px_rgba(255,204,4,0.6)]';
+          else if (borderDef.id === 'blue') borderMiniStyle = 'border border-blue-500 shadow-[0_0_4px_rgba(59,130,246,0.6)]';
+          else if (borderDef.id === 'emerald') borderMiniStyle = 'border border-emerald-500 shadow-[0_0_5px_rgba(16,185,129,0.7)]';
+          else if (borderDef.id === 'cyber') borderMiniStyle = 'border border-purple-500 shadow-[0_0_6px_rgba(168,85,247,0.75)] animate-pulse';
+          else borderMiniStyle = 'border border-slate-350/50';
 
           let avatarIconHTML = '';
           if (avatarDef.type === "monogram") {
-            avatarIconHTML = `<span class="text-[9px] font-black shrink-0 leading-none ${avatarBgDef.textColor || 'text-white'}">${avatarDef.char || std.name.charAt(0)}</span>`;
+            avatarIconHTML = `<span class="text-[9px] font-black shrink-0 leading-none ${textColorDef.textClass}">${avatarDef.char || std.name.charAt(0)}</span>`;
           } else if (avatarDef.type === "emoji") {
             avatarIconHTML = `<span class="text-[10px] leading-none shrink-0 select-none">${avatarEmojiDef.char}</span>`;
-          } else if (avatarDef.type === "icon") {
-            avatarIconHTML = `<i class="fa-solid ${avatarIconDef.icon} text-[9px] text-white shrink-0"></i>`;
           }
           
           let titleBadgeHTML = '';
@@ -4636,6 +4921,9 @@
           else if (idx === 1) badgeColor = "bg-slate-200 text-slate-700";
           else if (idx === 2) badgeColor = "bg-amber-700 text-white";
 
+          const shapeClass = shapeDef.shapeClass || "";
+          const shapeStyle = shapeDef.shapeStyle ? `style="${shapeDef.shapeStyle}"` : "";
+
           const row = document.createElement('div');
           row.className = "flex items-center justify-between p-2 rounded-lg border border-slate-100 bg-slate-50/40 hover:bg-slate-50 transition-colors";
           row.innerHTML = `
@@ -4643,9 +4931,9 @@
               <span class="w-5.5 h-5.5 rounded-full flex items-center justify-center font-black text-[9px] ${badgeColor} shrink-0">
                 ${idx + 1}
               </span>
-              <!-- Circular cosmetic avatar preview -->
-              <div class="w-6.5 h-6.5 rounded-full p-0.2 shrink-0 flex items-center justify-center bg-slate-200/50">
-                <div class="w-full h-full rounded-full bg-gradient-to-br ${avatarBgDef.gradient} flex items-center justify-center ${borderMiniStyle}">
+              <!-- Shaped cosmetic avatar preview -->
+              <div class="w-6.5 h-6.5 shrink-0 flex items-center justify-center bg-slate-200/50 ${shapeClass}" ${shapeStyle}>
+                <div class="w-full h-full bg-gradient-to-br ${avatarBgDef.gradient} flex items-center justify-center ring-1 ring-inset ring-white/50 ${shapeClass} ${borderMiniStyle}" ${shapeStyle}>
                   ${avatarIconHTML}
                 </div>
               </div>
@@ -4679,33 +4967,34 @@
           
           // Get cosmetics
           const cos = AppState.studentCosmetics[std.name] || {
-            avatar: { type: "monogram", char: std.name.charAt(0), emoji: "cat", icon: "grad", font: "default", bg: "default" },
+            avatar: { type: "monogram", char: std.name.charAt(0), emoji: "cat", font: "default", bg: "default", textColor: "white", shape: "circle" },
             border: "default",
             title: "default"
           };
           const avatarDef = cos.avatar;
+          if (!avatarDef.textColor) avatarDef.textColor = "white";
+          if (!avatarDef.shape) avatarDef.shape = "circle";
           
           const avatarBgDef = CosmeticCatalog.avatarBg.find(bg => bg.id === avatarDef.bg) || CosmeticCatalog.avatarBg[0];
           const avatarEmojiDef = CosmeticCatalog.avatarEmoji.find(e => e.id === avatarDef.emoji) || CosmeticCatalog.avatarEmoji[0];
-          const avatarIconDef = CosmeticCatalog.avatarIcon.find(i => i.id === avatarDef.icon) || CosmeticCatalog.avatarIcon[0];
+          const textColorDef = CosmeticCatalog.avatarTextColor.find(c => c.id === avatarDef.textColor) || CosmeticCatalog.avatarTextColor[0];
+          const shapeDef = CosmeticCatalog.avatarShape.find(s => s.id === avatarDef.shape) || CosmeticCatalog.avatarShape[0];
           
           const borderDef = CosmeticCatalog.border.find(b => b.id === cos.border) || CosmeticCatalog.border[0];
           const titleDef = CosmeticCatalog.title.find(t => t.id === cos.title) || CosmeticCatalog.title[0];
           
           let borderMiniStyle = '';
-          if (borderDef.id === 'gold') borderMiniStyle = 'border-2 border-copley-gold shadow-[0_0_5px_rgba(255,204,4,0.7)]';
-          else if (borderDef.id === 'blue') borderMiniStyle = 'border-2 border-blue-500 shadow-[0_0_5px_rgba(59,130,246,0.7)]';
-          else if (borderDef.id === 'emerald') borderMiniStyle = 'border-2 border-emerald-500 shadow-[0_0_7px_rgba(16,185,129,0.8)]';
-          else if (borderDef.id === 'cyber') borderMiniStyle = 'border-2 border-purple-500 shadow-[0_0_8px_rgba(168,85,247,0.85)]';
-          else borderMiniStyle = 'border border-slate-350';
+          if (borderDef.id === 'gold') borderMiniStyle = 'border border-copley-gold shadow-[0_0_4px_rgba(255,204,4,0.6)]';
+          else if (borderDef.id === 'blue') borderMiniStyle = 'border border-blue-500 shadow-[0_0_4px_rgba(59,130,246,0.6)]';
+          else if (borderDef.id === 'emerald') borderMiniStyle = 'border border-emerald-500 shadow-[0_0_5px_rgba(16,185,129,0.7)]';
+          else if (borderDef.id === 'cyber') borderMiniStyle = 'border border-purple-500 shadow-[0_0_6px_rgba(168,85,247,0.75)] animate-pulse';
+          else borderMiniStyle = 'border border-slate-350/50';
 
           let avatarIconHTML = '';
           if (avatarDef.type === "monogram") {
-            avatarIconHTML = `<span class="text-[9px] font-black shrink-0 leading-none ${avatarBgDef.textColor || 'text-white'}">${avatarDef.char || std.name.charAt(0)}</span>`;
+            avatarIconHTML = `<span class="text-[9px] font-black shrink-0 leading-none ${textColorDef.textClass}">${avatarDef.char || std.name.charAt(0)}</span>`;
           } else if (avatarDef.type === "emoji") {
             avatarIconHTML = `<span class="text-[10px] leading-none shrink-0 select-none">${avatarEmojiDef.char}</span>`;
-          } else if (avatarDef.type === "icon") {
-            avatarIconHTML = `<i class="fa-solid ${avatarIconDef.icon} text-[9px] text-white shrink-0"></i>`;
           }
           
           let titleBadgeHTML = '';
@@ -4718,6 +5007,9 @@
           else if (idx === 1) badgeColor = "bg-slate-200 text-slate-700";
           else if (idx === 2) badgeColor = "bg-amber-700 text-white";
 
+          const shapeClass = shapeDef.shapeClass || "";
+          const shapeStyle = shapeDef.shapeStyle ? `style="${shapeDef.shapeStyle}"` : "";
+
           const row = document.createElement('div');
           row.className = "flex items-center justify-between p-2 rounded-lg border border-slate-100 bg-slate-50/40 hover:bg-slate-50 transition-colors";
           row.innerHTML = `
@@ -4725,8 +5017,8 @@
               <span class="w-5.5 h-5.5 rounded-full flex items-center justify-center font-black text-[9px] ${badgeColor} shrink-0">
                 ${idx + 1}
               </span>
-              <div class="w-6.5 h-6.5 rounded-full p-0.2 shrink-0 flex items-center justify-center bg-slate-200/50">
-                <div class="w-full h-full rounded-full bg-gradient-to-br ${avatarBgDef.gradient} flex items-center justify-center ${borderMiniStyle}">
+              <div class="w-6.5 h-6.5 shrink-0 flex items-center justify-center bg-slate-200/50 ${shapeClass}" ${shapeStyle}>
+                <div class="w-full h-full bg-gradient-to-br ${avatarBgDef.gradient} flex items-center justify-center ring-1 ring-inset ring-white/50 ${shapeClass} ${borderMiniStyle}" ${shapeStyle}>
                   ${avatarIconHTML}
                 </div>
               </div>
@@ -4759,11 +5051,11 @@
       initStudentCosmetics();
       if (!AppState.studentCosmetics[student]) {
         AppState.studentCosmetics[student] = {
-          avatar: { type: "monogram", char: student.charAt(0), emoji: "cat", icon: "grad", font: "default", bg: "default" },
+          avatar: { type: "monogram", char: student.charAt(0), emoji: "cat", font: "default", bg: "default", textColor: "white", shape: "circle" },
           border: "default",
           title: "default",
           theme: { backdrop: "default", nameFont: "default", nameColor: "default" },
-          unlocked: ["avatarType-monogram", "avatarBg-default", "avatarFont-default", "avatarIcon-grad", "avatarEmoji-cat", "border-default", "title-default", "themeBackdrop-default", "themeNameFont-default", "themeNameColor-default"]
+          unlocked: ["avatarType-monogram", "avatarBg-default", "avatarFont-default", "avatarEmoji-cat", "avatarTextColor-white", "avatarShape-circle", "border-default", "title-default", "themeBackdrop-default", "themeNameFont-default", "themeNameColor-default"]
         };
       }
       
@@ -4773,7 +5065,8 @@
       const avatarBgDef = CosmeticCatalog.avatarBg.find(bg => bg.id === avatarDef.bg) || CosmeticCatalog.avatarBg[0];
       const avatarFontDef = CosmeticCatalog.avatarFont.find(f => f.id === avatarDef.font) || CosmeticCatalog.avatarFont[0];
       const avatarEmojiDef = CosmeticCatalog.avatarEmoji.find(e => e.id === avatarDef.emoji) || CosmeticCatalog.avatarEmoji[0];
-      const avatarIconDef = CosmeticCatalog.avatarIcon.find(i => i.id === avatarDef.icon) || CosmeticCatalog.avatarIcon[0];
+      const textColorDef = CosmeticCatalog.avatarTextColor.find(c => c.id === avatarDef.textColor) || CosmeticCatalog.avatarTextColor[0];
+      const shapeDef = CosmeticCatalog.avatarShape.find(s => s.id === avatarDef.shape) || CosmeticCatalog.avatarShape[0];
       
       const borderDef = CosmeticCatalog.border.find(b => b.id === cos.border) || CosmeticCatalog.border[0];
       const titleDef = CosmeticCatalog.title.find(t => t.id === cos.title) || CosmeticCatalog.title[0];
@@ -4848,26 +5141,37 @@
       // Update Name Badge Avatar Container & Icon & Letter
       const letterSpan = document.getElementById('studentDashboardLetter');
       const iconEl = document.getElementById('studentDashboardAvatarIcon');
-      const avatarGlow = document.getElementById('studentDashboardAvatarGlow');
-      const avatarContainer = document.getElementById('studentDashboardAvatarContainer');
+      const dashboardGlowWrapper = document.getElementById('studentDashboardAvatarGlowWrapper');
+      const dashboardOuter = document.getElementById('studentDashboardAvatarOuter');
+      const dashboardInner = document.getElementById('studentDashboardAvatarInner');
       
-      if (avatarGlow) {
-        avatarGlow.className = "absolute inset-0 rounded-full transition-all duration-300";
-        if (borderDef.id === "gold") {
-          avatarGlow.classList.add('shadow-[0_0_15px_rgba(255,204,4,0.85)]', 'border-2', 'border-copley-gold');
-        } else if (borderDef.id === "blue") {
-          avatarGlow.classList.add('shadow-[0_0_15px_rgba(59,130,246,0.85)]', 'border-2', 'border-blue-500', 'animate-pulse');
-        } else if (borderDef.id === "emerald") {
-          avatarGlow.classList.add('shadow-[0_0_20px_rgba(16,185,129,0.9)]', 'border-2', 'border-emerald-500');
-        } else if (borderDef.id === "cyber") {
-          avatarGlow.classList.add('shadow-[0_0_25px_rgba(168,85,247,0.95)]', 'border-2', 'border-purple-500', 'animate-pulse');
-        } else {
-          avatarGlow.className = "absolute inset-1 border border-slate-200/40 rounded-full";
-        }
+      const shapeClass = shapeDef.shapeClass || "";
+      const shapeStyle = shapeDef.shapeStyle || "";
+
+      if (dashboardGlowWrapper) {
+        dashboardGlowWrapper.style.cssText = getAvatarGlowStyle(borderDef.id);
       }
 
-      if (avatarContainer) {
-        avatarContainer.className = `w-20 h-20 rounded-full flex items-center justify-center border-2 border-white shadow-md relative group select-none transition-all duration-300 z-10 bg-gradient-to-br ${avatarBgDef.gradient}`;
+      if (dashboardOuter) {
+        let outerBg = "bg-slate-200";
+        if (borderDef.id === "gold") outerBg = "bg-copley-gold";
+        else if (borderDef.id === "blue") outerBg = "bg-blue-500";
+        else if (borderDef.id === "emerald") outerBg = "bg-emerald-500";
+        else if (borderDef.id === "cyber") outerBg = "bg-gradient-to-tr from-purple-500 to-pink-500";
+        else {
+          if (themeBackdropDef.id === 'darkglass' || themeBackdropDef.id === 'nebula' || themeBackdropDef.id === 'lofi') {
+            outerBg = "bg-slate-700";
+          } else {
+            outerBg = "bg-slate-200";
+          }
+        }
+        dashboardOuter.className = `w-20 h-20 p-[2px] transition-all duration-300 ${outerBg} ${shapeClass}`;
+        dashboardOuter.style.cssText = shapeStyle;
+      }
+
+      if (dashboardInner) {
+        dashboardInner.className = `w-full h-full flex items-center justify-center relative select-none transition-all duration-300 bg-gradient-to-br ${avatarBgDef.gradient} ${shapeClass}`;
+        dashboardInner.style.cssText = shapeStyle;
       }
 
       if (letterSpan) letterSpan.classList.add('hidden');
@@ -4876,7 +5180,7 @@
       if (avatarDef.type === "monogram") {
         if (letterSpan) {
           letterSpan.innerText = avatarDef.char || student.charAt(0);
-          letterSpan.className = `text-3xl font-black leading-none z-10 select-none ${avatarBgDef.textColor || 'text-white'} ${avatarFontDef.fontClass}`;
+          letterSpan.className = `text-3xl font-black leading-none z-10 select-none ${textColorDef.textClass} ${avatarFontDef.fontClass}`;
           letterSpan.classList.remove('hidden');
         }
       } else if (avatarDef.type === "emoji") {
@@ -4884,11 +5188,6 @@
           letterSpan.innerText = avatarEmojiDef.char;
           letterSpan.className = "text-4xl leading-none z-10 select-none";
           letterSpan.classList.remove('hidden');
-        }
-      } else if (avatarDef.type === "icon") {
-        if (iconEl) {
-          iconEl.className = `fa-solid ${avatarIconDef.icon} text-2xl z-10 select-none text-white`;
-          iconEl.classList.remove('hidden');
         }
       }
       
@@ -5956,107 +6255,108 @@
       }, 300);
       playSynthClick();
     }
-
-    // =========================================================================
-    // STUDENT NAME BADGE COSMETIC CUSTOMIZER transactions engine
-    // =========================================================================
-    const CosmeticCatalog = {
+        const CosmeticCatalog = {
       avatarType: [
         { id: "monogram", name: "Classic Monogram", cost: 0, desc: "Initials typography style." },
-        { id: "emoji", name: "Emoji Character", cost: 5, desc: "Expressive lo-fi character face." },
-        { id: "icon", name: "Academic / Club Icon", cost: 5, desc: "Scholastic and extra-curricular symbols." }
+        { id: "emoji", name: "Emoji Character", cost: 2, desc: "Expressive lo-fi character face." }
       ],
       avatarEmoji: [
-        { id: "cat", name: "Chill Cat 🐱", char: "🐱", cost: 5, desc: "Cozy feline scholar aesthetic." },
-        { id: "dog", name: "Loyal Dog 🐶", char: "🐶", cost: 5, desc: "Playful, friendly advisor vibe." },
-        { id: "fox", name: "Clever Fox 🦊", char: "🦊", cost: 5, desc: "Sharp-witted, logical strategist." },
-        { id: "lion", name: "Bold Lion 🦁", char: "🦁", cost: 5, desc: "School spirit and athletic power." },
-        { id: "panda", name: "Cozy Panda 🐼", char: "🐼", cost: 5, desc: "Deep study relax energy." },
-        { id: "frog", name: "Zen Frog 🐸", char: "🐸", cost: 5, desc: "Mindful, self-managed leader." },
-        { id: "unicorn", name: "Unicorn 🦄", char: "🦄", cost: 8, desc: "Rare creative spark & innovator." },
-        { id: "alien", name: "Explorer 👽", char: "👽", cost: 8, desc: "Out-of-this-world sci-tech vision." },
-        { id: "robot", name: "AI Builder 🤖", char: "🤖", cost: 8, desc: "Technology club operator." },
-        { id: "dino", name: "T-Rex 🦖", char: "🦖", cost: 5, desc: "Mighty curiosity and historical strength." },
-        { id: "gamepad", name: "Gamer Elite 🎮", char: "🎮", cost: 6, desc: "Strategic check-ins and problem solver." },
-        { id: "headphones", name: "Lo-Fi Beats 🎧", char: "🎧", cost: 6, desc: "Deep focus study session vibes." },
-        { id: "rocket", name: "Rocket 🚀", char: "🚀", cost: 8, desc: "Shooting for high academic honors." },
-        { id: "bolt", name: "Thunder Spark ⚡", char: "⚡", cost: 5, desc: "Charged with raw creative drive." },
-        { id: "sparkles", name: "Sparkles ✨", char: "✨", cost: 6, desc: "Shining bright in community service." },
-        { id: "skate", name: "Skateboard 🛹", char: "🛹", cost: 5, desc: "Active, cool-headed peer guide." }
+        { id: "cat", name: "Chill Cat 🐱", char: "🐱", cost: 2, desc: "Cozy feline scholar aesthetic." },
+        { id: "dog", name: "Loyal Dog 🐶", char: "🐶", cost: 2, desc: "Playful, friendly advisor vibe." },
+        { id: "fox", name: "Clever Fox 🦊", char: "🦊", cost: 2, desc: "Sharp-witted, logical strategist." },
+        { id: "lion", name: "Bold Lion 🦁", char: "🦁", cost: 2, desc: "School spirit and athletic power." },
+        { id: "panda", name: "Cozy Panda 🐼", char: "🐼", cost: 2, desc: "Deep study relax energy." },
+        { id: "frog", name: "Zen Frog 🐸", char: "🐸", cost: 2, desc: "Mindful, self-managed leader." },
+        { id: "unicorn", name: "Unicorn 🦄", char: "🦄", cost: 3, desc: "Rare creative spark & innovator." },
+        { id: "alien", name: "Explorer 👽", char: "👽", cost: 3, desc: "Out-of-this-world sci-tech vision." },
+        { id: "robot", name: "AI Builder 🤖", char: "🤖", cost: 3, desc: "Technology club operator." },
+        { id: "dino", name: "T-Rex 🦖", char: "🦖", cost: 2, desc: "Mighty curiosity and historical strength." },
+        { id: "gamepad", name: "Gamer Elite 🎮", char: "🎮", cost: 2, desc: "Strategic check-ins and problem solver." },
+        { id: "headphones", name: "Lo-Fi Beats 🎧", char: "🎧", cost: 2, desc: "Deep focus study session vibes." },
+        { id: "rocket", name: "Rocket 🚀", char: "🚀", cost: 3, desc: "Shooting for high academic honors." },
+        { id: "bolt", name: "Thunder Spark ⚡", char: "⚡", cost: 2, desc: "Charged with raw creative drive." },
+        { id: "sparkles", name: "Sparkles ✨", char: "✨", cost: 3, desc: "Shining bright in community service." },
+        { id: "skate", name: "Skateboard 🛹", char: "🛹", cost: 2, desc: "Active, cool-headed peer guide." }
       ],
       avatarBg: [
         { id: "default", name: "Classic Copley", gradient: "from-copley-blue to-indigo-950 border border-copley-gold/25", cost: 0, desc: "Official deep navy Copley Indians theme.", textColor: "text-copley-gold" },
-        { id: "copley", name: "Copley Blue & Gold", gradient: "from-copley-blue to-indigo-950 border border-copley-gold/30", cost: 5, desc: "Official Copley Indians school theme.", textColor: "text-copley-gold" },
-        { id: "sunset", name: "Sunset Horizon", gradient: "from-pink-500 via-rose-500 to-amber-500", cost: 6, desc: "Warm and radiant color sweep.", textColor: "text-white" },
-        { id: "aurora", name: "Neon Aurora", gradient: "from-teal-400 to-emerald-500", cost: 6, desc: "Glow northerly neon lights.", textColor: "text-indigo-955" },
-        { id: "cyber", name: "Cyberpunk Wave", gradient: "from-purple-600 via-pink-500 to-blue-500", cost: 8, desc: "High-contrast dynamic synthwave loop.", textColor: "text-white" },
-        { id: "obsidian", name: "Obsidian Space", gradient: "from-zinc-950 via-neutral-900 to-slate-950", cost: 8, desc: "Sleek, premium matte-dark sphere.", textColor: "text-copley-gold" },
-        { id: "mint", name: "Lime Splash", gradient: "from-lime-400 to-emerald-600", cost: 5, desc: "Energetic and fresh minty tones.", textColor: "text-white" },
-        { id: "candy", name: "Cotton Candy", gradient: "from-blue-200 via-purple-200 to-pink-200", cost: 5, desc: "Soft pastel, cozy cloud tones.", textColor: "text-slate-800" }
+        { id: "copley", name: "Copley Blue & Gold", gradient: "from-copley-blue to-indigo-950 border border-copley-gold/30", cost: 2, desc: "Official Copley Indians school theme.", textColor: "text-copley-gold" },
+        { id: "sunset", name: "Sunset Horizon", gradient: "from-pink-500 via-rose-500 to-amber-500", cost: 2, desc: "Warm and radiant color sweep.", textColor: "text-white" },
+        { id: "aurora", name: "Neon Aurora", gradient: "from-teal-400 to-emerald-500", cost: 2, desc: "Glow northerly neon lights.", textColor: "text-indigo-955" },
+        { id: "cyber", name: "Cyberpunk Wave", gradient: "from-purple-600 via-pink-500 to-blue-500", cost: 3, desc: "High-contrast dynamic synthwave loop.", textColor: "text-white" },
+        { id: "obsidian", name: "Obsidian Space", gradient: "from-zinc-950 via-neutral-900 to-slate-950", cost: 3, desc: "Sleek, premium matte-dark sphere.", textColor: "text-copley-gold" },
+        { id: "mint", name: "Lime Splash", gradient: "from-lime-400 to-emerald-600", cost: 2, desc: "Energetic and fresh minty tones.", textColor: "text-white" },
+        { id: "candy", name: "Cotton Candy", gradient: "from-blue-200 via-purple-200 to-pink-200", cost: 2, desc: "Soft pastel, cozy cloud tones.", textColor: "text-slate-800" }
       ],
       avatarFont: [
         { id: "default", name: "Sleek Sans", fontClass: "font-sleek-sans", cost: 0, desc: "Modern sans-serif typography." },
-        { id: "varsity", name: "Varsity Block", fontClass: "font-display-varsity", cost: 5, desc: "Collegiate high-spirit block letters." },
-        { id: "serif", name: "Royal Serif", fontClass: "font-editorial-serif", cost: 5, desc: "Elegant literary academic script." },
-        { id: "neon", name: "Cyber Neon", fontClass: "font-cyber-neon text-shadow-neon", cost: 6, desc: "Glowing tech-lab console letters." }
+        { id: "varsity", name: "Varsity Block", fontClass: "font-display-varsity", cost: 2, desc: "Collegiate high-spirit block letters." },
+        { id: "serif", name: "Royal Serif", fontClass: "font-editorial-serif", cost: 2, desc: "Elegant literary academic script." },
+        { id: "neon", name: "Cyber Neon", fontClass: "font-cyber-neon text-shadow-neon", cost: 3, desc: "Glowing tech-lab console letters." }
       ],
-      avatarIcon: [
-        { id: "grad", name: "User Graduate (Default)", icon: "fa-user-graduate", cost: 0, desc: "Standard scholar profile symbol." },
-        { id: "shield", name: "Brand Shield", icon: "fa-shield-halved", cost: 5, desc: "Primary brand shield for academic prestige." },
-        { id: "atom", name: "Sci-Tech Atom", icon: "fa-atom", cost: 5, desc: "For technical innovators and coders." },
-        { id: "trophy", name: "Champion Trophy", icon: "fa-trophy", cost: 5, desc: "For athletic and leadership team captains." },
-        { id: "palette", name: "Creative Palette", icon: "fa-palette", cost: 5, desc: "For visual arts, music, and writers." },
-        { id: "brain", name: "Logic Brain", icon: "fa-brain", cost: 5, desc: "Represents critical thinking and memory masters." },
-        { id: "gavel", name: "Debate Gavel", icon: "fa-gavel", cost: 5, desc: "For public speech and student council leaders." },
-        { id: "globe", name: "Global Thinker", icon: "fa-globe", cost: 5, desc: "For languages, history, and international studies." }
+      avatarTextColor: [
+        { id: "white", name: "Pristine White Glow", textClass: "monogram-white", cost: 0, desc: "Classic glowing white lettering." },
+        { id: "gold", name: "Copley Gold Glow", textClass: "monogram-gold", cost: 1, desc: "Signature school spirit gold highlight." },
+        { id: "navy", name: "Copley Navy Solid", textClass: "monogram-navy", cost: 1, desc: "Flat deep navy letters (with high contrast border)." },
+        { id: "cyan", name: "Electric Cyan Glow", textClass: "monogram-cyan", cost: 2, desc: "Glowing cyan-blue cyber highlight." },
+        { id: "magenta", name: "Neon Rose Glow", textClass: "monogram-magenta", cost: 2, desc: "Hot pink neon letter glow." },
+        { id: "lime", name: "Vibrant Lime Glow", textClass: "monogram-lime", cost: 2, desc: "High contrast green highlight." },
+        { id: "charcoal", name: "Stealth Charcoal", textClass: "monogram-charcoal", cost: 1, desc: "Deep dark grey solid letters (with high contrast border)." }
+      ],
+      avatarShape: [
+        { id: "circle", name: "Classic Circle", shapeClass: "avatar-shape-circle", shapeStyle: "", cost: 0, desc: "Perfect round badge shape." },
+        { id: "square", name: "Sleek Square", shapeClass: "avatar-shape-square", shapeStyle: "", cost: 1, desc: "Modern rounded square shape." },
+        { id: "shield", name: "Knightly Shield", shapeClass: "avatar-shape-shield", shapeStyle: "", cost: 2, desc: "Academic excellence brand shield." },
+        { id: "arrowhead", name: "Indians Arrowhead", shapeClass: "avatar-shape-arrowhead", shapeStyle: "", cost: 3, desc: "Copley arrowhead heritage badge shape." }
       ],
       border: [
         { id: "default", name: "Classic Slate", borderClass: "shadow-sm border-slate-200", cost: 0, desc: "Standard clean Copley styling." },
-        { id: "gold", name: "Gold Topaz Aura", borderClass: "shadow-[0_0_12px_rgba(255,204,4,0.7)] border-2 border-copley-gold", cost: 10, desc: "Rich athletic gold glow representing school excellence." },
-        { id: "blue", name: "Sapphire Spark", borderClass: "shadow-[0_0_12px_rgba(59,130,246,0.7)] border-2 border-blue-500", cost: 10, desc: "Cool blue haptic wave representing peace and wisdom." },
-        { id: "emerald", name: "Emerald Fire", borderClass: "shadow-[0_0_15px_rgba(16,185,129,0.8)] border-2 border-emerald-500", cost: 12, desc: "Vibrant deep green fire for self-managed leaders." },
-        { id: "cyber", name: "Cyberpunk Pulse", borderClass: "shadow-[0_0_20px_rgba(168,85,247,0.9)] border-2 border-purple-500", cost: 15, desc: "highly premium pulsing purple gradient haptic ring." }
+        { id: "gold", name: "Gold Topaz Aura", borderClass: "", cost: 3, desc: "Rich athletic gold glow representing school excellence." },
+        { id: "blue", name: "Sapphire Spark", borderClass: "", cost: 3, desc: "Cool blue haptic wave representing peace and wisdom." },
+        { id: "emerald", name: "Emerald Fire", borderClass: "", cost: 4, desc: "Vibrant deep green fire for self-managed leaders." },
+        { id: "cyber", name: "Cyberpunk Pulse", borderClass: "", cost: 5, desc: "highly premium pulsing purple gradient haptic ring." }
       ],
       title: [
         { id: "default", name: "No Title", titleText: "", cost: 0, desc: "Clean, name-only badge layout." },
-        { id: "scholar", name: "Copley Scholar", titleText: "Copley Scholar", cost: 5, desc: "Dedicated student committed to learning." },
+        { id: "scholar", name: "Copley Scholar", titleText: "Copley Scholar", cost: 2, desc: "Dedicated student committed to learning." },
         { id: "guru", name: "Gratitude Guru", titleText: "Gratitude Guru", cost: 0, reqVso: 3, desc: "FREE unlock after sending 3 gratitude virtual slips to staff!" },
-        { id: "spirit", name: "Spirit Leader", titleText: "Spirit Leader", cost: 10, desc: "A vocal advocate for graduating Copley House Cup points." },
-        { id: "trailblazer", name: "Quiet Achiever", titleText: "Quiet Achiever", cost: 8, desc: "For the unsung heroes of focus, care, and kindness." }
+        { id: "spirit", name: "Spirit Leader", titleText: "Spirit Leader", cost: 3, desc: "A vocal advocate for graduating Copley House Cup points." },
+        { id: "trailblazer", name: "Quiet Achiever", titleText: "Quiet Achiever", cost: 3, desc: "For the unsung heroes of focus, care, and kindness." }
       ],
       themeBackdrop: [
         { id: "default", name: "Classic Copley", cardClass: "bg-white border border-slate-200/80 text-slate-800", cost: 0, desc: "Standard Copley High slate-and-white card." },
-        { id: "darkglass", name: "Stealth Cyber", cardClass: "bg-slate-900 border border-purple-500/30 text-white shadow-[0_0_15px_rgba(168,85,247,0.15)] dark", cost: 10, desc: "Sleek dark-mode card with glowing purple energy." },
-        { id: "royal", name: "Royal Prestige", cardClass: "bg-gradient-to-br from-amber-50 via-white to-orange-50/50 border border-copley-gold text-copley-blue shadow-[0_4px_12px_rgba(212,175,55,0.1)]", cost: 10, desc: "Premium collegiate gold trim with warm parchment." },
-        { id: "nebula", name: "Cosmic Nebula", cardClass: "bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 border border-indigo-500/40 text-slate-100 shadow-[0_4px_15px_rgba(99,102,241,0.15)] dark", cost: 12, desc: "Deep space purple-to-blue starlight gradient." },
-        { id: "monogram", name: "Translucent Monogram", cardClass: "bg-gradient-to-br from-blue-50 via-white to-indigo-50/30 border border-slate-200 text-copley-blue", hasMonogramBg: true, cost: 8, desc: "Large translucent initials watermark behind card contents." },
-        { id: "emoji", name: "Emoji Wallpaper Grid", cardClass: "bg-gradient-to-br from-slate-50 via-white to-slate-100/50 border border-slate-200 text-slate-800", hasEmojiBg: true, cost: 8, desc: "Cool repeat floating wall pattern of your active emoji." },
-        { id: "lofi", name: "Retro Vaporwave Grid", cardClass: "bg-gradient-to-br from-indigo-950 via-purple-950 to-pink-950 border border-pink-500/40 text-pink-100 shadow-[0_4px_15px_rgba(236,72,153,0.2)] dark", isLofiGrid: true, cost: 12, desc: "Retro synthwave 3D neon wireframe mesh card." }
+        { id: "darkglass", name: "Stealth Cyber", cardClass: "bg-slate-900 border border-purple-500/30 text-white shadow-[0_0_15px_rgba(168,85,247,0.15)] dark", cost: 3, desc: "Sleek dark-mode card with glowing purple energy." },
+        { id: "royal", name: "Royal Prestige", cardClass: "bg-gradient-to-br from-amber-50 via-white to-orange-50/50 border border-copley-gold text-copley-blue shadow-[0_4px_12px_rgba(212,175,55,0.1)]", cost: 3, desc: "Premium collegiate gold trim with warm parchment." },
+        { id: "nebula", name: "Cosmic Nebula", cardClass: "bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 border border-indigo-500/40 text-slate-100 shadow-[0_4px_15px_rgba(99,102,241,0.15)] dark", cost: 4, desc: "Deep space purple-to-blue starlight gradient." },
+        { id: "monogram", name: "Translucent Monogram", cardClass: "bg-gradient-to-br from-blue-50 via-white to-indigo-50/30 border border-slate-200 text-copley-blue", hasMonogramBg: true, cost: 2, desc: "Large translucent initials watermark behind card contents." },
+        { id: "emoji", name: "Emoji Wallpaper Grid", cardClass: "bg-gradient-to-br from-slate-50 via-white to-slate-100/50 border border-slate-200 text-slate-800", hasEmojiBg: true, cost: 2, desc: "Cool repeat floating wall pattern of your active emoji." },
+        { id: "lofi", name: "Retro Vaporwave Grid", cardClass: "bg-gradient-to-br from-indigo-950 via-purple-950 to-pink-950 border border-pink-500/40 text-pink-100 shadow-[0_4px_15px_rgba(236,72,153,0.2)] dark", isLofiGrid: true, cost: 4, desc: "Retro synthwave 3D neon wireframe mesh card." }
       ],
       themeNameFont: [
         { id: "default", name: "Sleek Sans", fontClass: "font-sleek-sans", cost: 0, desc: "Standard sans-serif styling." },
-        { id: "varsity", name: "Varsity Block", fontClass: "font-display-varsity", cost: 5, desc: "Collegiate block varsity lettering style." },
-        { id: "serif", name: "Royal Serif", fontClass: "font-editorial-serif", cost: 5, desc: "Graceful classic academic script." },
-        { id: "neon", name: "Cyber Neon Glow", fontClass: "font-cyber-neon theme-name-purple", cost: 6, desc: "Futuristic glowing terminal lettering." }
+        { id: "varsity", name: "Varsity Block", fontClass: "font-display-varsity", cost: 2, desc: "Collegiate block varsity lettering style." },
+        { id: "serif", name: "Royal Serif", fontClass: "font-editorial-serif", cost: 2, desc: "Graceful classic academic script." },
+        { id: "neon", name: "Cyber Neon Glow", fontClass: "font-cyber-neon theme-name-purple", cost: 3, desc: "Futuristic glowing terminal lettering." }
       ],
       themeNameColor: [
         { id: "default", name: "Default Contrast", textStyle: "", cost: 0, desc: "Standard theme text contrast colors." },
-        { id: "gold", name: "Gold Topaz Glow", textStyle: "theme-name-gold", cost: 5, desc: "Radiant Copley Gold prestige lettering." },
-        { id: "purple", name: "Purple Cyber Glow", textStyle: "theme-name-purple", cost: 5, desc: "Glowing cyberpunk neon purple tones." },
-        { id: "mint", name: "Emerald Mint Glow", textStyle: "theme-name-mint", cost: 5, desc: "Fresh fluorescent green glowing shadow." },
-        { id: "crimson", name: "Ruby Crimson Glow", textStyle: "theme-name-crimson", cost: 5, desc: "Burning ruby-red intense highlight text." }
+        { id: "gold", name: "Gold Topaz Glow", textStyle: "theme-name-gold", cost: 2, desc: "Radiant Copley Gold prestige lettering." },
+        { id: "purple", name: "Purple Cyber Glow", textStyle: "theme-name-purple", cost: 2, desc: "Glowing cyberpunk neon purple tones." },
+        { id: "mint", name: "Emerald Mint Glow", textStyle: "theme-name-mint", cost: 2, desc: "Fresh fluorescent green glowing shadow." },
+        { id: "crimson", name: "Ruby Crimson Glow", textStyle: "theme-name-crimson", cost: 2, desc: "Burning ruby-red intense highlight text." }
       ]
     };
 
-    let activeCustomizerTab = "avatar";
+    let activeCustomizerTab = "shape-bg";
     let currentPreviewState = {
       avatar: {
         type: "monogram",
         char: "",
         emoji: "cat",
-        icon: "grad",
         font: "default",
-        bg: "default"
+        bg: "default",
+        textColor: "white",
+        shape: "circle"
       },
       border: "default",
       title: "default",
@@ -6080,9 +6380,10 @@
                 type: "monogram",
                 char: s.name.charAt(0),
                 emoji: "cat",
-                icon: "grad",
                 font: "default",
-                bg: "default"
+                bg: "default",
+                textColor: "white",
+                shape: "circle"
               },
               border: "default",
               title: "default",
@@ -6095,8 +6396,9 @@
                 "avatarType-monogram",
                 "avatarBg-default",
                 "avatarFont-default",
-                "avatarIcon-grad",
                 "avatarEmoji-cat",
+                "avatarTextColor-white",
+                "avatarShape-circle",
                 "border-default",
                 "title-default",
                 "themeBackdrop-default",
@@ -6113,16 +6415,16 @@
         }
       }
 
-      // Execute schema migrations on active database records to support old string-based values safely!
+      // Execute schema migrations on active database records to support old values safely!
       AppState.students.forEach(s => {
         let cos = AppState.studentCosmetics[s.name];
         if (!cos) {
           AppState.studentCosmetics[s.name] = {
-            avatar: { type: "monogram", char: s.name.charAt(0), emoji: "cat", icon: "grad", font: "default", bg: "default" },
+            avatar: { type: "monogram", char: s.name.charAt(0), emoji: "cat", font: "default", bg: "default", textColor: "white", shape: "circle" },
             border: "default",
             title: "default",
             theme: { backdrop: "default", nameFont: "default", nameColor: "default" },
-            unlocked: ["avatarType-monogram", "avatarBg-default", "avatarFont-default", "avatarIcon-grad", "avatarEmoji-cat", "border-default", "title-default", "themeBackdrop-default", "themeNameFont-default", "themeNameColor-default"]
+            unlocked: ["avatarType-monogram", "avatarBg-default", "avatarFont-default", "avatarEmoji-cat", "avatarTextColor-white", "avatarShape-circle", "border-default", "title-default", "themeBackdrop-default", "themeNameFont-default", "themeNameColor-default"]
           };
           cos = AppState.studentCosmetics[s.name];
         }
@@ -6131,19 +6433,14 @@
         if (typeof cos.avatar === "string") {
           const oldAvatar = cos.avatar;
           cos.avatar = {
-            type: (oldAvatar === "default") ? "monogram" : "icon",
+            type: "monogram",
             char: s.name.charAt(0),
             emoji: "cat",
-            icon: (oldAvatar !== "default") ? oldAvatar : "grad",
             font: "default",
-            bg: "default"
+            bg: "default",
+            textColor: "white",
+            shape: "circle"
           };
-          // Make sure baseline unlocks are preserved
-          if (!cos.unlocked.includes("avatarType-monogram")) cos.unlocked.push("avatarType-monogram");
-          if (!cos.unlocked.includes("avatarBg-default")) cos.unlocked.push("avatarBg-default");
-          if (!cos.unlocked.includes("avatarFont-default")) cos.unlocked.push("avatarFont-default");
-          if (!cos.unlocked.includes("avatarIcon-grad")) cos.unlocked.push("avatarIcon-grad");
-          if (!cos.unlocked.includes("avatarEmoji-cat")) cos.unlocked.push("avatarEmoji-cat");
         }
 
         // 2. Migrate old flat string theme field to structured theme object
@@ -6161,14 +6458,19 @@
           if (!cos.unlocked.includes("themeNameColor-default")) cos.unlocked.push("themeNameColor-default");
         }
 
+        // Ensure newly introduced properties exist in avatar definition
+        if (!cos.avatar.textColor) cos.avatar.textColor = "white";
+        if (!cos.avatar.shape) cos.avatar.shape = "circle";
+
         // Double check standard unlocked contents
         if (!cos.unlocked) {
           cos.unlocked = [
             "avatarType-monogram",
             "avatarBg-default",
             "avatarFont-default",
-            "avatarIcon-grad",
             "avatarEmoji-cat",
+            "avatarTextColor-white",
+            "avatarShape-circle",
             "border-default",
             "title-default",
             "themeBackdrop-default",
@@ -6176,6 +6478,14 @@
             "themeNameColor-default"
           ];
         }
+
+        // Make sure basic colors/shapes are unlocked
+        if (!cos.unlocked.includes("avatarTextColor-white")) cos.unlocked.push("avatarTextColor-white");
+        if (!cos.unlocked.includes("avatarShape-circle")) cos.unlocked.push("avatarShape-circle");
+        if (!cos.unlocked.includes("avatarType-monogram")) cos.unlocked.push("avatarType-monogram");
+        if (!cos.unlocked.includes("avatarBg-default")) cos.unlocked.push("avatarBg-default");
+        if (!cos.unlocked.includes("avatarFont-default")) cos.unlocked.push("avatarFont-default");
+        if (!cos.unlocked.includes("avatarEmoji-cat")) cos.unlocked.push("avatarEmoji-cat");
       });
       
       // Persist modifications
@@ -6233,6 +6543,20 @@
       playSynthClick();
     }
 
+    function getAvatarGlowStyle(borderId) {
+      if (borderId === "gold") {
+        return "filter: drop-shadow(0 0 12px rgba(255, 204, 4, 0.95));";
+      } else if (borderId === "blue") {
+        return "filter: drop-shadow(0 0 12px rgba(59, 130, 246, 0.95)); animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;";
+      } else if (borderId === "emerald") {
+        return "filter: drop-shadow(0 0 15px rgba(16, 185, 129, 0.95));";
+      } else if (borderId === "cyber") {
+        return "filter: drop-shadow(0 0 18px rgba(168, 85, 247, 0.95)); animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;";
+      } else {
+        return "filter: none;";
+      }
+    }
+
     function updateCustomizerPreview() {
       const student = AppState.activeStudent;
       const std = AppState.students.find(s => s.name === student) || { points: 0 };
@@ -6245,7 +6569,8 @@
       const avatarBgDef = CosmeticCatalog.avatarBg.find(bg => bg.id === avatarDef.bg) || CosmeticCatalog.avatarBg[0];
       const avatarFontDef = CosmeticCatalog.avatarFont.find(f => f.id === avatarDef.font) || CosmeticCatalog.avatarFont[0];
       const avatarEmojiDef = CosmeticCatalog.avatarEmoji.find(e => e.id === avatarDef.emoji) || CosmeticCatalog.avatarEmoji[0];
-      const avatarIconDef = CosmeticCatalog.avatarIcon.find(i => i.id === avatarDef.icon) || CosmeticCatalog.avatarIcon[0];
+      const textColorDef = CosmeticCatalog.avatarTextColor.find(c => c.id === avatarDef.textColor) || CosmeticCatalog.avatarTextColor[0];
+      const shapeDef = CosmeticCatalog.avatarShape.find(s => s.id === avatarDef.shape) || CosmeticCatalog.avatarShape[0];
       
       const borderDef = CosmeticCatalog.border.find(b => b.id === cos.border) || CosmeticCatalog.border[0];
       const titleDef = CosmeticCatalog.title.find(t => t.id === cos.title) || CosmeticCatalog.title[0];
@@ -6308,22 +6633,34 @@
       
       // Update preview elements
       const previewLetter = document.getElementById('previewLetter');
-      const previewIcon = document.getElementById('previewAvatarIcon');
-      const previewGlow = document.getElementById('previewAvatarGlow');
-      const previewContainer = document.getElementById('previewAvatarContainer');
+      const previewGlowWrapper = document.getElementById('previewAvatarGlowWrapper');
+      const previewOuter = document.getElementById('previewAvatarOuter');
+      const previewInner = document.getElementById('previewAvatarInner');
       const previewTitle = document.getElementById('previewTitleBadge');
       
       if (previewLetter) previewLetter.classList.add('hidden');
-      if (previewIcon) previewIcon.classList.add('hidden');
       
-      if (previewContainer) {
-        previewContainer.className = `w-20 h-20 rounded-full flex items-center justify-center border-2 border-white shadow-md relative select-none transition-all duration-300 z-10 bg-gradient-to-br ${avatarBgDef.gradient}`;
+      const shapeClass = shapeDef.shapeClass || "";
+      const shapeStyle = shapeDef.shapeStyle || "";
+
+      if (previewGlowWrapper) {
+        previewGlowWrapper.style.cssText = getAvatarGlowStyle(borderDef.id);
+      }
+
+      if (previewOuter) {
+        previewOuter.className = `w-20 h-20 bg-white p-[2px] transition-all duration-300 ${shapeClass}`;
+        previewOuter.style.cssText = shapeStyle;
+      }
+
+      if (previewInner) {
+        previewInner.className = `w-full h-full flex items-center justify-center relative select-none transition-all duration-300 bg-gradient-to-br ${avatarBgDef.gradient} ${shapeClass}`;
+        previewInner.style.cssText = shapeStyle;
       }
       
       if (avatarDef.type === "monogram") {
         if (previewLetter) {
           previewLetter.innerText = avatarDef.char || student.charAt(0);
-          previewLetter.className = `text-3xl leading-none z-10 select-none ${avatarFontDef.fontClass}`;
+          previewLetter.className = `text-3xl font-black leading-none z-10 select-none ${textColorDef.textClass} ${avatarFontDef.fontClass}`;
           previewLetter.classList.remove('hidden');
         }
       } else if (avatarDef.type === "emoji") {
@@ -6331,27 +6668,6 @@
           previewLetter.innerText = avatarEmojiDef.char;
           previewLetter.className = "text-4xl leading-none z-10 select-none";
           previewLetter.classList.remove('hidden');
-        }
-      } else if (avatarDef.type === "icon") {
-        if (previewIcon) {
-          previewIcon.className = `fa-solid ${avatarIconDef.icon} text-2xl z-10 select-none text-white`;
-          previewIcon.classList.remove('hidden');
-        }
-      }
-      
-      // Apply glowing class in preview
-      if (previewGlow) {
-        previewGlow.className = "absolute inset-0 rounded-full transition-all duration-300";
-        if (borderDef.id === "gold") {
-          previewGlow.classList.add('shadow-[0_0_15px_rgba(255,204,4,0.85)]', 'border-2', 'border-copley-gold');
-        } else if (borderDef.id === "blue") {
-          previewGlow.classList.add('shadow-[0_0_15px_rgba(59,130,246,0.85)]', 'border-2', 'border-blue-500', 'animate-pulse');
-        } else if (borderDef.id === "emerald") {
-          previewGlow.classList.add('shadow-[0_0_20px_rgba(16,185,129,0.9)]', 'border-2', 'border-emerald-500');
-        } else if (borderDef.id === "cyber") {
-          previewGlow.classList.add('shadow-[0_0_25px_rgba(168,85,247,0.95)]', 'border-2', 'border-purple-500', 'animate-pulse');
-        } else {
-          previewGlow.className = "absolute inset-1 border border-slate-200/40 rounded-full";
         }
       }
       
@@ -6379,14 +6695,14 @@
       activeCustomizerTab = tabId;
       playSynthBasicClick();
       
-      const tabs = ["avatar", "border", "title", "theme"];
+      const tabs = ["shape-bg", "initials-emoji", "border", "title", "theme"];
       tabs.forEach(t => {
         const btn = document.getElementById(`custTab-${t}`);
         if (btn) {
           if (t === tabId) {
-            btn.className = "flex-grow bg-white text-copley-blue px-2.5 py-1.5 rounded-lg shadow-sm font-black uppercase text-center transition-all";
+            btn.className = "flex-grow bg-white text-copley-blue px-2 py-1.5 rounded-lg shadow-sm font-black uppercase text-center transition-all";
           } else {
-            btn.className = "flex-grow text-slate-500 hover:text-slate-700 px-2.5 py-1.5 rounded-lg font-black uppercase text-center transition-all";
+            btn.className = "flex-grow text-slate-500 hover:text-slate-700 px-2 py-1.5 rounded-lg font-black uppercase text-center transition-all";
           }
         }
       });
@@ -6407,108 +6723,66 @@
       updateCustomizerPreview();
     }
 
-    function equipDirectItem(category, itemId) {
-      const student = AppState.activeStudent;
-      const cosState = AppState.studentCosmetics[student];
-      if (!cosState) return;
-      
-      cosState[category] = itemId;
-      currentPreviewState[category] = itemId;
-      playSynthBasicClick();
-      showToast("Equipped! 🛡️", "Cosmetic successfully equipped!");
-      
-      localStorage.setItem('AppState_studentCosmetics', JSON.stringify(AppState.studentCosmetics));
-      updateCustomizerPreview();
-      renderCustomizerShop();
-      updateStudentDashboard();
-      hydrateScoreboard();
-      renderStudentLeaderboard();
-    }
-
-    function buyOrEquipDirectCosmetic(category, itemId) {
-      const student = AppState.activeStudent;
-      const std = AppState.students.find(s => s.name === student);
-      if (!std) return;
-      
-      const cosState = AppState.studentCosmetics[student];
-      const items = CosmeticCatalog[category];
-      const item = items.find(i => i.id === itemId);
-      if (!item) return;
-      
-      if (std.points < item.cost) {
-        playSynthBasicClick();
-        showToast("Insufficient Points!", `You need ${item.cost} points.`);
-        return;
-      }
-      
-      std.points -= item.cost;
-      cosState.unlocked.push(`${category}-${itemId}`);
-      cosState[category] = itemId;
-      currentPreviewState[category] = itemId;
-      
-      playSynthSuccess();
-      triggerConfetti();
-      showToast("🎟️ UNLOCKED!", `Successfully unlocked ${item.name}!`);
-      
-      localStorage.setItem('AppState_studentCosmetics', JSON.stringify(AppState.studentCosmetics));
-      updateCustomizerPreview();
-      renderCustomizerShop();
-      updateStudentDashboard();
-      hydrateScoreboard();
-      renderStudentLeaderboard();
-    }
-
-    function buyOrEquipGridItem(categoryName, itemId, cost) {
-      const student = AppState.activeStudent;
-      const std = AppState.students.find(s => s.name === student);
-      if (!std) return;
-      
-      initStudentCosmetics();
-      const cosState = AppState.studentCosmetics[student];
-      
-      if (std.points < cost) {
-        playSynthBasicClick();
-        showToast("Insufficient Points!", `You need ${cost} points, but you have ${std.points} points.`);
-        return;
-      }
-      
-      // Deduct points
-      std.points -= cost;
-      // Add unlock
-      cosState.unlocked.push(`${categoryName}-${itemId}`);
-      
-      // Equip or apply in preview immediately
-      if (categoryName.startsWith('avatar')) {
-        const key = categoryName.replace('avatar', '');
-        const keyLower = key.charAt(0).toLowerCase() + key.slice(1);
-        currentPreviewState.avatar[keyLower] = itemId;
-      } else if (categoryName.startsWith('theme')) {
-        const key = categoryName.replace('theme', '');
-        const keyLower = key.charAt(0).toLowerCase() + key.slice(1);
-        currentPreviewState.theme[keyLower] = itemId;
-      }
-      
-      playSynthSuccess();
-      triggerConfetti();
-      showToast("🎟️ ASSET UNLOCKED!", `Successfully unlocked!`);
-      
-      localStorage.setItem('AppState_studentCosmetics', JSON.stringify(AppState.studentCosmetics));
-      
-      updateCustomizerPreview();
-      renderCustomizerShop();
-    }
-
     function saveChangesTransaction() {
       const student = AppState.activeStudent;
+      const std = AppState.students.find(s => s.name === student);
+      if (!std) return;
+      
       const cosState = AppState.studentCosmetics[student];
       if (!cosState) return;
+
+      const lockedItems = getSelectedLockedItems(cosState);
+      let totalCost = 0;
+      let unmetVso = null;
+
+      const gratitudeSlips = AppState.mockSlips.filter(slip => slip.sender === student).length;
+
+      lockedItems.forEach(item => {
+        if (item.isVso) {
+          if (item.vsoReq !== undefined && gratitudeSlips < item.vsoReq) {
+            unmetVso = item;
+          }
+        } else {
+          totalCost += item.cost;
+        }
+      });
+
+      if (unmetVso) {
+        playSynthBasicClick();
+        showToast("Locked Cosmetic!", `You need to send ${unmetVso.vsoReq} gratitude slips to unlock ${unmetVso.name}.`);
+        return;
+      }
+
+      if (std.points < totalCost) {
+        playSynthBasicClick();
+        showToast("Insufficient Points!", `You need ${totalCost} points, but you only have ${std.points} points.`);
+        return;
+      }
+
+      // Deduct points
+      std.points -= totalCost;
+
+      // Unlock all items in cart
+      lockedItems.forEach(item => {
+        if (!cosState.unlocked.includes(item.key)) {
+          cosState.unlocked.push(item.key);
+        }
+      });
 
       // Copy preview state back to active equipped cosmetics
       cosState.avatar = JSON.parse(JSON.stringify(currentPreviewState.avatar));
       cosState.theme = JSON.parse(JSON.stringify(currentPreviewState.theme));
+      cosState.border = currentPreviewState.border;
+      cosState.title = currentPreviewState.title;
 
       playSynthSuccess();
-      showToast("Design Applied! 🎨", "Your fully customized name badge & contact poster has been published!");
+      triggerConfetti();
+      
+      if (totalCost > 0) {
+        showToast("🎟️ Purchased & Applied! 🎨", `Successfully unlocked ${lockedItems.length} cosmetics and updated your badge!`);
+      } else {
+        showToast("Design Applied! 🎨", "Your fully customized name badge & contact poster has been published!");
+      }
       
       localStorage.setItem('AppState_studentCosmetics', JSON.stringify(AppState.studentCosmetics));
       
@@ -6554,6 +6828,22 @@
             <i class="fa-solid ${item.icon} text-lg text-copley-blue"></i>
             <span class="text-[7px] font-bold text-slate-500 truncate w-full mt-1.5 leading-none block">${item.name.replace(' (Default)', '')}</span>
           `;
+        } else if (categoryName === 'avatarTextColor') {
+          itemDisplayHTML = `
+            <div class="w-7 h-7 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center shadow-inner">
+              <span class="text-sm font-black leading-none ${item.textClass} select-none">A</span>
+            </div>
+            <span class="text-[8px] font-bold text-slate-500 truncate w-full mt-1 leading-none block">${item.name.replace(' Glow', '').replace(' Solid', '')}</span>
+          `;
+        } else if (categoryName === 'avatarShape') {
+          let shapeStyle = item.shapeStyle || "";
+          let shapeClass = item.shapeClass || "";
+          itemDisplayHTML = `
+            <div class="w-7 h-7 bg-copley-blue flex items-center justify-center border border-white shadow-sm shadow-indigo-950/20 ${shapeClass}" style="${shapeStyle}">
+              <i class="fa-solid fa-shapes text-[9px] text-white"></i>
+            </div>
+            <span class="text-[8px] font-bold text-slate-500 truncate w-full mt-1 leading-none block">${item.name.split(' ')[1] || item.name.split(' ')[0]}</span>
+          `;
         } else if (categoryName === 'avatarFont' || categoryName === 'themeNameFont') {
           itemDisplayHTML = `
             <span class="${item.fontClass} text-base leading-none block text-copley-blue select-none">Aa</span>
@@ -6584,17 +6874,17 @@
         if (!isUnlocked) {
           card.classList.add('opacity-90');
           const canAfford = std.points >= item.cost;
-          let lockColor = canAfford ? 'text-copley-gold' : 'text-slate-300';
+          let lockColor = canAfford ? 'text-copley-gold' : 'text-slate-350';
           
           const lockHTML = `
-            <div class="absolute inset-0 bg-slate-900/40 border border-slate-800 rounded-xl flex flex-col items-center justify-center text-white gap-0.5">
-              <i class="fa-solid fa-lock text-[10px] ${lockColor}"></i>
-              <span class="text-[8px] font-black">${item.cost}p</span>
+            <div class="absolute top-1 right-1 bg-slate-900/85 px-1.5 py-0.5 rounded text-[7px] font-black text-copley-gold border border-slate-800/40 flex items-center gap-0.5 shadow-sm select-none z-20">
+              <i class="fa-solid fa-lock text-[6px] ${lockColor}"></i>
+              <span>${item.cost}p</span>
             </div>
           `;
           card.innerHTML = lockHTML + itemDisplayHTML;
           card.onclick = () => {
-            buyOrEquipGridItem(categoryName, item.id, item.cost);
+            onSelectCallback(item.id);
           };
         } else {
           card.innerHTML = itemDisplayHTML;
@@ -6607,17 +6897,134 @@
       container.appendChild(grid);
     }
 
+    function getSelectedLockedItems(cosState) {
+      const locked = [];
+      const gratitudeSlips = AppState.mockSlips.filter(slip => slip.sender === AppState.activeStudent).length;
+
+      const addIfLocked = (category, itemId, catalogArray) => {
+        if (!itemId || itemId === 'default') return;
+        const key = `${category}-${itemId}`;
+        if (!cosState.unlocked.includes(key)) {
+          const item = catalogArray.find(i => i.id === itemId);
+          if (item) {
+            if (item.reqVso !== undefined) {
+              const met = gratitudeSlips >= item.reqVso;
+              if (!met) {
+                locked.push({
+                  key: key,
+                  category: category,
+                  id: itemId,
+                  cost: 0,
+                  name: item.name,
+                  vsoReq: item.reqVso,
+                  isVso: true
+                });
+              } else {
+                locked.push({
+                  key: key,
+                  category: category,
+                  id: itemId,
+                  cost: 0,
+                  name: item.name,
+                  isVso: true
+                });
+              }
+            } else if (item.cost > 0) {
+              locked.push({
+                key: key,
+                category: category,
+                id: itemId,
+                cost: item.cost,
+                name: item.name
+              });
+            }
+          }
+        }
+      };
+
+      addIfLocked('avatarBg', currentPreviewState.avatar.bg, CosmeticCatalog.avatarBg);
+      addIfLocked('avatarType', currentPreviewState.avatar.type, CosmeticCatalog.avatarType);
+
+      if (currentPreviewState.avatar.type === 'monogram') {
+        addIfLocked('avatarFont', currentPreviewState.avatar.font, CosmeticCatalog.avatarFont);
+        addIfLocked('avatarTextColor', currentPreviewState.avatar.textColor, CosmeticCatalog.avatarTextColor);
+      } else if (currentPreviewState.avatar.type === 'emoji') {
+        addIfLocked('avatarEmoji', currentPreviewState.avatar.emoji, CosmeticCatalog.avatarEmoji);
+      }
+
+      addIfLocked('avatarShape', currentPreviewState.avatar.shape, CosmeticCatalog.avatarShape);
+      addIfLocked('border', currentPreviewState.border, CosmeticCatalog.border);
+      addIfLocked('title', currentPreviewState.title, CosmeticCatalog.title);
+
+      addIfLocked('themeBackdrop', currentPreviewState.theme.backdrop, CosmeticCatalog.themeBackdrop);
+      addIfLocked('themeNameFont', currentPreviewState.theme.nameFont, CosmeticCatalog.themeNameFont);
+      addIfLocked('themeNameColor', currentPreviewState.theme.nameColor, CosmeticCatalog.themeNameColor);
+
+      return locked;
+    }
+
     function renderSaveButton(container, cosState, std) {
+      const lockedItems = getSelectedLockedItems(cosState);
+      let totalCost = 0;
+      let unmetVso = null;
+      const gratitudeSlips = AppState.mockSlips.filter(slip => slip.sender === AppState.activeStudent).length;
+
+      lockedItems.forEach(item => {
+        if (item.isVso) {
+          if (item.vsoReq !== undefined && gratitudeSlips < item.vsoReq) {
+            unmetVso = item;
+          }
+        } else {
+          totalCost += item.cost;
+        }
+      });
+
       const saveDiv = document.createElement('div');
-      saveDiv.className = "bg-white border border-slate-200/80 p-3.5 rounded-xl shadow-md flex justify-between items-center mt-6 select-none";
+      saveDiv.className = "bg-white border border-slate-205/85 p-4 rounded-xl shadow-md flex flex-col sm:flex-row justify-between items-center mt-6 select-none gap-3.5 border-l-4 border-l-copley-gold";
+      
+      let cartDetailsHTML = '';
+      if (lockedItems.length > 0) {
+        cartDetailsHTML = `
+          <div class="mt-2 text-[9px] text-slate-500 bg-slate-50 border border-slate-100 p-2 rounded-lg space-y-1 w-full font-semibold">
+            <span class="font-bold text-[8px] text-slate-400 uppercase block tracking-wider">Unlocks in Cart:</span>
+            ${lockedItems.map(item => `
+              <div class="flex justify-between items-center">
+                <span>• ${item.name}</span>
+                <span class="font-bold text-slate-650">${item.isVso ? 'Free (Slips Met)' : `${item.cost} points`}</span>
+              </div>
+            `).join('')}
+          </div>
+        `;
+      }
+
+      let buttonDisabled = '';
+      let buttonClass = 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-500 hover:border-emerald-400';
+      let buttonText = 'Save & Apply Customization';
+      
+      if (unmetVso) {
+        buttonDisabled = 'disabled';
+        buttonClass = 'bg-slate-200 text-slate-400 border-slate-300 cursor-not-allowed';
+        buttonText = `Locked: Needs ${unmetVso.vsoReq} Slips`;
+      } else if (totalCost > 0) {
+        if (std.points < totalCost) {
+          buttonDisabled = 'disabled';
+          buttonClass = 'bg-rose-100 text-rose-500 border-rose-200 cursor-not-allowed';
+          buttonText = `Need ${totalCost} pts (Have ${std.points}p)`;
+        } else {
+          buttonClass = 'bg-copley-gold hover:opacity-95 text-copley-blue border-copley-gold/30';
+          buttonText = `Unlock & Apply (-${totalCost}p)`;
+        }
+      }
+
       saveDiv.innerHTML = `
-        <div class="text-left">
+        <div class="text-left w-full sm:w-auto">
           <span class="text-[8px] font-black text-slate-400 uppercase tracking-widest block leading-none">Customizer Studio</span>
-          <span class="text-[10px] font-extrabold text-slate-700 block mt-1">Mix & Match Active Layout</span>
+          <span class="text-[10px] font-extrabold text-slate-700 block mt-1">Points Balance: <span class="text-copley-blue font-black">${std.points}p</span></span>
+          ${cartDetailsHTML}
         </div>
-        <button onclick="saveChangesTransaction()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[9px] px-5 py-2.5 rounded-lg transition uppercase shadow active:scale-95 flex items-center gap-1.5 border border-transparent">
+        <button onclick="saveChangesTransaction()" ${buttonDisabled} class="${buttonClass} border font-black text-[10px] px-5 py-3 rounded-xl transition uppercase shadow active:scale-95 flex items-center justify-center gap-1.5 shrink-0 select-none tracking-widest heading-style w-full sm:w-auto">
           <i class="fa-solid fa-floppy-disk"></i>
-          <span>Save & Apply Customization</span>
+          <span>${buttonText}</span>
         </button>
       `;
       container.appendChild(saveDiv);
@@ -6631,7 +7038,7 @@
       const student = AppState.activeStudent;
       const std = AppState.students.find(s => s.name === student) || { points: 0 };
       const cosState = AppState.studentCosmetics[student] || {
-        avatar: { type: "monogram", char: student.charAt(0), emoji: "cat", icon: "grad", font: "default", bg: "default" },
+        avatar: { type: "monogram", char: student.charAt(0), emoji: "cat", font: "default", bg: "default", textColor: "white", shape: "circle" },
         border: "default",
         title: "default",
         theme: { backdrop: "default", nameFont: "default", nameColor: "default" },
@@ -6641,8 +7048,23 @@
       const gratitudeSlips = AppState.mockSlips.filter(slip => slip.sender === student).length;
 
       // Render tab-specific shops
-      if (activeCustomizerTab === 'avatar') {
-        const activeType = currentPreviewState.avatar.type || "monogram";
+      if (activeCustomizerTab === 'shape-bg') {
+        renderUpgradeGrid("1. Select Avatar Shape Outline", "avatarShape", CosmeticCatalog.avatarShape, currentPreviewState.avatar.shape, (itemId) => {
+          currentPreviewState.avatar.shape = itemId;
+          playSynthBasicClick();
+          updateCustomizerPreview();
+          renderCustomizerShop();
+        }, cosState, std);
+
+        renderUpgradeGrid("2. Select Profile Background Gradient Glow", "avatarBg", CosmeticCatalog.avatarBg, currentPreviewState.avatar.bg, (itemId) => {
+          currentPreviewState.avatar.bg = itemId;
+          playSynthBasicClick();
+          updateCustomizerPreview();
+          renderCustomizerShop();
+        }, cosState, std, false, false, true);
+
+      } else if (activeCustomizerTab === 'initials-emoji') {
+        const activeType = currentPreviewState.avatar.type === 'emoji' ? 'emoji' : 'monogram';
         
         const typeSelectionHTML = `
           <div class="space-y-1.5 mb-4">
@@ -6650,7 +7072,6 @@
             <div class="flex bg-slate-200/60 p-0.5 rounded-lg border border-slate-200/20 font-bold text-[9px] select-none">
               <button onclick="changePreviewAvatarType('monogram')" class="flex-grow ${activeType === 'monogram' ? 'bg-white text-copley-blue shadow-sm font-black' : 'text-slate-500'} px-2 py-1.5 rounded-lg uppercase text-center transition-all">Monogram</button>
               <button onclick="changePreviewAvatarType('emoji')" class="flex-grow ${activeType === 'emoji' ? 'bg-white text-copley-blue shadow-sm font-black' : 'text-slate-500'} px-2 py-1.5 rounded-lg uppercase text-center transition-all">Emoji</button>
-              <button onclick="changePreviewAvatarType('icon')" class="flex-grow ${activeType === 'icon' ? 'bg-white text-copley-blue shadow-sm font-black' : 'text-slate-500'} px-2 py-1.5 rounded-lg uppercase text-center transition-all">Academic Icon</button>
             </div>
           </div>
         `;
@@ -6676,6 +7097,14 @@
             updateCustomizerPreview();
             renderCustomizerShop();
           }, cosState, std);
+
+          renderUpgradeGrid("Monogram Letter Glow Color", "avatarTextColor", CosmeticCatalog.avatarTextColor, currentPreviewState.avatar.textColor, (itemId) => {
+            currentPreviewState.avatar.textColor = itemId;
+            playSynthBasicClick();
+            updateCustomizerPreview();
+            renderCustomizerShop();
+          }, cosState, std);
+
         } else if (activeType === "emoji") {
           renderUpgradeGrid("Select Custom Emoji Face", "avatarEmoji", CosmeticCatalog.avatarEmoji, currentPreviewState.avatar.emoji, (itemId) => {
             currentPreviewState.avatar.emoji = itemId;
@@ -6683,23 +7112,7 @@
             updateCustomizerPreview();
             renderCustomizerShop();
           }, cosState, std, true);
-        } else if (activeType === "icon") {
-          renderUpgradeGrid("Select Academic Icon Symbol", "avatarIcon", CosmeticCatalog.avatarIcon, currentPreviewState.avatar.icon, (itemId) => {
-            currentPreviewState.avatar.icon = itemId;
-            playSynthBasicClick();
-            updateCustomizerPreview();
-            renderCustomizerShop();
-          }, cosState, std, false, true);
         }
-
-        renderUpgradeGrid("2. Select Profile Background Glow Gradient", "avatarBg", CosmeticCatalog.avatarBg, currentPreviewState.avatar.bg, (itemId) => {
-          currentPreviewState.avatar.bg = itemId;
-          playSynthBasicClick();
-          updateCustomizerPreview();
-          renderCustomizerShop();
-        }, cosState, std, false, false, true);
-
-        renderSaveButton(container, cosState, std);
 
       } else if (activeCustomizerTab === 'theme') {
         renderUpgradeGrid("Select Poster Backdrop Wallpaper", "themeBackdrop", CosmeticCatalog.themeBackdrop, currentPreviewState.theme.backdrop, (itemId) => {
@@ -6723,8 +7136,6 @@
           renderCustomizerShop();
         }, cosState, std);
 
-        renderSaveButton(container, cosState, std);
-
       } else {
         const items = CosmeticCatalog[activeCustomizerTab];
         const activeEquipped = cosState[activeCustomizerTab];
@@ -6740,57 +7151,45 @@
           const isPreviewed = currentPreviewState[activeCustomizerTab] === item.id;
           
           let buttonHTML = '';
-          
           if (isEquipped) {
             buttonHTML = `
-              <button class="bg-emerald-50 text-emerald-600 border border-emerald-200 font-black text-[9px] px-3.5 py-2 rounded-lg flex items-center gap-1.5 uppercase cursor-default select-none shadow-sm">
+              <div class="bg-emerald-50 text-emerald-600 border border-emerald-200 font-black text-[9px] px-3.5 py-2 rounded-lg flex items-center gap-1.5 uppercase select-none shadow-sm font-semibold font-semibold">
                 <i class="fa-solid fa-circle-check"></i>
                 <span>Equipped</span>
-              </button>
+              </div>
             `;
-          } else if (isUnlocked) {
+          } else if (isPreviewed) {
             buttonHTML = `
-              <button onclick="equipDirectItem('${activeCustomizerTab}', '${item.id}')" class="bg-copley-blue hover:opacity-95 text-copley-gold border border-copley-blue/30 font-black text-[9px] px-4 py-2 rounded-lg transition uppercase shadow-sm active:scale-95 flex items-center gap-1.5">
-                <i class="fa-solid fa-shirt"></i>
-                <span>Equip</span>
-              </button>
+              <div class="bg-amber-50 text-amber-600 border border-amber-200 font-black text-[9px] px-3.5 py-2 rounded-lg flex items-center gap-1.5 uppercase select-none shadow-sm font-semibold animate-pulse">
+                <i class="fa-solid fa-wand-magic-sparkles"></i>
+                <span>Previewing</span>
+              </div>
             `;
           } else {
-            if (item.reqVso !== undefined) {
-              const progress = Math.min(gratitudeSlips, item.reqVso);
-              const met = gratitudeSlips >= item.reqVso;
-              if (met) {
+            if (!isUnlocked) {
+              if (item.reqVso !== undefined) {
+                const progress = Math.min(gratitudeSlips, item.reqVso);
                 buttonHTML = `
-                  <button onclick="buyOrEquipDirectCosmetic('${activeCustomizerTab}', '${item.id}')" class="bg-emerald-600 hover:bg-emerald-700 text-white border border-emerald-500 font-black text-[9px] px-4 py-2 rounded-lg transition uppercase shadow-sm active:scale-95 flex items-center gap-1.5">
-                    <i class="fa-solid fa-lock-open animate-bounce"></i>
-                    <span>Unlock!</span>
+                  <button onclick="currentPreviewState['${activeCustomizerTab}'] = '${item.id}'; playSynthBasicClick(); updateCustomizerPreview(); renderCustomizerShop();" class="bg-slate-100 hover:bg-slate-200 text-slate-500 border border-slate-200 font-black text-[8px] px-2.5 py-2 rounded-lg flex items-center gap-1.5 uppercase transition">
+                    <i class="fa-solid fa-lock text-[8px] text-slate-400"></i>
+                    <span>Preview (Slips: ${progress}/${item.reqVso})</span>
                   </button>
                 `;
               } else {
                 buttonHTML = `
-                  <button disabled class="bg-slate-100 text-slate-400 border border-slate-200 font-black text-[8px] px-2.5 py-2 rounded-lg flex items-center gap-1.5 uppercase cursor-not-allowed select-none">
-                    <i class="fa-solid fa-lock text-[8px]"></i>
-                    <span>Slips: ${progress}/${item.reqVso}</span>
+                  <button onclick="currentPreviewState['${activeCustomizerTab}'] = '${item.id}'; playSynthBasicClick(); updateCustomizerPreview(); renderCustomizerShop();" class="bg-slate-100 hover:bg-slate-200 text-slate-500 border border-slate-200 font-black text-[8px] px-2.5 py-2 rounded-lg flex items-center gap-1.5 uppercase transition">
+                    <i class="fa-solid fa-lock text-[8px] text-copley-gold"></i>
+                    <span>Preview (-${item.cost}p)</span>
                   </button>
                 `;
               }
             } else {
-              const canAfford = std.points >= item.cost;
-              if (canAfford) {
-                buttonHTML = `
-                  <button onclick="buyOrEquipDirectCosmetic('${activeCustomizerTab}', '${item.id}')" class="bg-copley-gold text-copley-blue border border-copley-gold/30 hover:opacity-95 font-black text-[9px] px-3.5 py-2 rounded-lg transition uppercase shadow-sm active:scale-95 flex items-center gap-1">
-                    <i class="fa-solid fa-unlock-keyhole"></i>
-                    <span>Buy (-${item.cost}p)</span>
-                  </button>
-                `;
-              } else {
-                buttonHTML = `
-                  <button disabled class="bg-slate-100 text-slate-400 border border-slate-200 font-black text-[9px] px-3 py-2 rounded-lg flex items-center gap-1 uppercase cursor-not-allowed select-none">
-                    <i class="fa-solid fa-lock text-[8px]"></i>
-                    <span>-${item.cost} PTS</span>
-                  </button>
-                `;
-              }
+              buttonHTML = `
+                <button onclick="currentPreviewState['${activeCustomizerTab}'] = '${item.id}'; playSynthBasicClick(); updateCustomizerPreview(); renderCustomizerShop();" class="bg-copley-blue hover:opacity-95 text-copley-gold border border-copley-blue/30 font-black text-[9px] px-4 py-2 rounded-lg transition uppercase shadow-sm active:scale-95 flex items-center gap-1.5">
+                  <i class="fa-solid fa-eye"></i>
+                  <span>Preview</span>
+                </button>
+              `;
             }
           }
 
@@ -6849,6 +7248,9 @@
           container.appendChild(row);
         });
       }
+
+      // Render Save & Apply cart button at the bottom of EVERY tab!
+      renderSaveButton(container, cosState, std);
     }
 
     // MTSS Student Tiers Controller
