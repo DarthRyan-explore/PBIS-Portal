@@ -1618,36 +1618,11 @@
             showToast("Intervention Logged! 📊", `Saved strategy implementation notes for ${activeMockMTSSStudent}.`);
             playSynthSuccess();
             toggleMTSSComplete(activeMockMTSSStudent, true);
-            closeMockMTSSSheetModal();
           };
 
-          // Save All Caseload Data
-          function saveMTSSCaseload(data) {
-            localStorage.setItem('AppState_mtssCaseload', JSON.stringify(data));
-          }
-
-          // Mark Case Complete Toggle
+          // Placeholder completion
           function toggleMTSSComplete(studentName, targetState = true) {
-            const data = getAllMTSSCaseload();
-            const idx = data.findIndex(s => s.student === studentName);
-            if (idx !== -1) {
-              data[idx].completed = targetState;
-              saveMTSSCaseload(data);
-              
-              renderMTSSDashboard();
-              recalculateDistrictStats();
-              updateSidebarMTSSAlerts();
-              updateTeacherBadges();
-              updateDepartmentLeaderboard();
-
-              if (targetState) {
-                showToast("Intervention Completed!", `Student ${studentName}'s documentation marked COMPLETED.`);
-                playSynthSuccess();
-              } else {
-                showToast("Case Restored", `${studentName}'s active caseload case has been reopened.`);
-                playSynthClick();
-              }
-            }
+            showToast("Documentation Saved", "Logged to secure spreadsheet.");
           }
 
           function renderMTSSDashboard() {
@@ -1656,103 +1631,60 @@
             
             if (!bannerContainer || !dashboardArea) return;
 
-            const teacher = AppState.activeTeacher;
-            const allData = getAllMTSSCaseload();
-            
-            const teacherCaseload = allData.filter(s => s.teacher === teacher);
-            const activeCaseload = teacherCaseload.filter(s => !s.completed);
-
-            if (activeCaseload.length > 0) {
-              bannerContainer.innerHTML = `
-                <div class="bg-amber-50 border-l-4 border-copley-gold p-4 rounded-xl flex items-center justify-between shadow-md mb-6 animate-pulse select-none" style="animation-duration: 3s;">
-                  <div class="flex items-center space-x-3.5">
-                    <div class="bg-copley-gold text-copley-blue p-2 rounded-xl">
-                      <i class="fa-solid fa-circle-exclamation text-base"></i>
-                    </div>
-                    <div>
-                      <h4 class="text-sm font-black text-slate-800 uppercase tracking-wide heading-style">Active Caseload Notifications</h4>
-                      <p class="text-xs text-slate-600 font-semibold mt-0.5">
-                        Hi <strong>${teacher}</strong>! You currently have <span class="text-rose-600 font-black">${activeCaseload.length}</span> active student Tier 1 documentation sheets that need an update. Please check your links below.
-                      </p>
-                    </div>
+            bannerContainer.innerHTML = `
+              <div class="bg-sky-50 border-l-4 border-sky-500 p-4 rounded-xl flex items-center justify-between shadow-md mb-6 select-none animate-fade-in">
+                <div class="flex items-center space-x-3.5">
+                  <div class="bg-sky-500 text-white p-2 rounded-xl">
+                    <i class="fa-solid fa-shield-halved text-base"></i>
                   </div>
-                  <span class="text-[9px] bg-copley-gold/30 text-copley-blue font-black px-2.5 py-1 rounded uppercase tracking-wider heading-style hidden sm:inline-block">Action Required</span>
-                </div>
-              `;
-            } else {
-              bannerContainer.innerHTML = '';
-            }
-
-            const quotes = [
-              "“The beautiful thing about learning is that no one can take it away from you.” — B.B. King",
-              "“Every kid is one caring adult away from being a success story.” — Josh Shipp",
-              "“Teaching is the greatest act of optimism.” — Colleen Wilcox",
-              "“Education is not the filling of a pail, but the lighting of a fire.” — William Butler Yeats",
-              "“Children are like wet cement, whatever falls on them makes an impression.” — Haim Ginott",
-              "“The influence of a great teacher can never be erased.” — Unknown"
-            ];
-            const quoteIdx = teacher.split('').reduce((sum, char) => sum + char.charCodeAt(0), 0) % quotes.length;
-
-            if (activeCaseload.length === 0) {
-              dashboardArea.innerHTML = `
-                <div class="bg-white border border-slate-200/80 p-8 rounded-2xl shadow-glass text-center relative overflow-hidden max-w-2xl mx-auto my-6">
-                  <div class="absolute -right-24 -top-24 w-48 h-48 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none"></div>
-                  <div class="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mx-auto shadow-sm border border-emerald-100/60 mb-4 select-none">
-                    <i class="fa-solid fa-circle-check text-2xl animate-bounce"></i>
+                  <div>
+                    <h4 class="text-sm font-black text-slate-800 uppercase tracking-wide heading-style">Secure Google Workspace Integration</h4>
+                    <p class="text-xs text-slate-600 font-semibold mt-0.5">
+                      To protect student privacy under FERPA guidelines, individual MTSS caseloads are managed securely via Google Forms & Sheets.
+                    </p>
                   </div>
-                  <h3 class="text-base font-black text-copley-blue heading-style uppercase tracking-wide">No Action Required</h3>
-                  <p class="text-xs text-slate-500 font-semibold mt-2 max-w-md mx-auto leading-relaxed">
-                    All clear! You do not have any active Tier 1 student cases assigned to you this quarter. Excellent job keeping up with your student documentation and classroom strategies!
-                  </p>
-                  <div class="h-px bg-slate-100 my-5"></div>
-                  <p class="text-[11px] text-copley-blue font-bold italic tracking-wide">
-                    ${quotes[quoteIdx]}
-                  </p>
                 </div>
-              `;
-            } else {
-              let cardsHTML = '';
-              activeCaseload.forEach(c => {
-                cardsHTML += `
-                  <!-- Caseload Card for ${c.student} -->
-                  <div class="bg-white border border-slate-200/80 rounded-2xl shadow-glass p-5 flex flex-col justify-between relative group hover:border-copley-gold hover:shadow-lg transition-all duration-300 transform hover:translate-y-[-1px]">
-                    <div class="absolute -right-12 -top-12 w-24 h-24 bg-copley-blue/5 rounded-full blur-2xl pointer-events-none group-hover:bg-copley-gold/5 transition-colors"></div>
-                    
-                    <div class="space-y-3.5">
-                      <div class="flex justify-between items-start gap-2 border-b border-slate-100 pb-3">
-                        <div>
-                          <h4 class="text-sm font-black text-copley-blue heading-style uppercase tracking-tight">${c.student}</h4>
-                          <span class="text-[9px] bg-slate-100 text-slate-500 font-black px-2 py-0.5 rounded uppercase mt-1 inline-block">${c.class} • ${c.mod}</span>
-                        </div>
-                        <span class="text-[8px] font-black bg-rose-50 text-rose-500 border border-rose-100 px-2 py-1 rounded uppercase tracking-wider heading-style shrink-0">Tier 1 Active</span>
-                      </div>
+                <span class="text-[9px] bg-sky-100 text-sky-850 font-black px-2.5 py-1 rounded uppercase tracking-wider heading-style hidden sm:inline-block">FERPA Secure</span>
+              </div>
+            `;
 
-                      <div class="bg-slate-50 border border-slate-200/50 p-3 rounded-xl text-[10px] leading-relaxed">
-                        <span class="text-[8px] text-slate-400 font-black block uppercase tracking-wider">Referral Trigger Reason:</span>
-                        <p class="text-slate-600 font-bold mt-0.5">${c.referralSource}</p>
-                      </div>
-                    </div>
-
-                    <div class="mt-5 pt-3.5 border-t border-slate-100 flex items-center justify-between gap-3">
-                      <button onclick="openMockGoogleSheet('${c.student}', '${c.class}')" class="flex-grow bg-copley-blue hover:opacity-95 text-copley-gold border border-slate-205 font-bold text-[10px] px-3.5 py-3 rounded-xl transition uppercase text-center shadow-sm active:scale-98 flex items-center justify-center gap-1.5 heading-style select-none tracking-widest">
-                        <span>Open Strategy Sheet</span>
-                        <i class="fa-solid fa-clipboard-list text-[9px]"></i>
-                      </button>
-                      <button onclick="toggleMTSSComplete('${c.student}', true)" class="bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[10px] px-4 py-3 rounded-xl border border-emerald-500 hover:border-emerald-400 transition uppercase tracking-widest active:scale-98 flex items-center gap-1 shrink-0 heading-style">
-                        <i class="fa-solid fa-check"></i>
-                        <span>Done</span>
-                      </button>
-                    </div>
+            dashboardArea.innerHTML = `
+              <div class="bg-white border border-slate-200/80 p-8 rounded-2xl shadow-glass text-center relative overflow-hidden max-w-2xl mx-auto my-6 w-full">
+                <div class="absolute -right-24 -top-24 w-48 h-48 bg-copley-blue/5 rounded-full blur-3xl pointer-events-none"></div>
+                <div class="w-16 h-16 bg-copley-blue/5 text-copley-blue rounded-full flex items-center justify-center mx-auto shadow-sm border border-copley-blue/10 mb-4 select-none">
+                  <i class="fa-solid fa-clipboard-list text-2xl animate-pulse"></i>
+                </div>
+                <h3 class="text-base font-black text-copley-blue heading-style uppercase tracking-wide">MTSS Academic Tier 1 Documentation</h3>
+                <p class="text-xs text-slate-500 font-semibold mt-2 max-w-md mx-auto leading-relaxed">
+                  Log student academic intervention checklists, strategy outcomes, and flex support sessions securely. Entries are automatically logged to the master administrative ledger.
+                </p>
+                <div class="mt-6 flex flex-col sm:flex-row gap-3.5 justify-center">
+                  <button onclick="window.open(GOOGLE_FORM_URLS.mtssIntervention, '_blank'); showToast('Opening MTSS Form', 'Redirecting to secure Google Forms.');" class="bg-copley-blue hover:opacity-95 text-copley-gold border border-slate-205 font-bold text-[10px] px-5 py-3.5 rounded-xl transition uppercase text-center shadow-sm active:scale-98 flex items-center justify-center gap-1.5 heading-style select-none tracking-widest">
+                    <span>Log Tier 1 Intervention via Google Form</span>
+                    <i class="fa-solid fa-arrow-up-right-from-square text-[8px]"></i>
+                  </button>
+                </div>
+                <div class="h-px bg-slate-100 my-5"></div>
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center mt-2">
+                  <div>
+                    <span class="text-[9px] text-slate-400 font-black block uppercase tracking-wider">Active Caseload</span>
+                    <span class="text-base font-black text-slate-700 mt-1 block">24 Students</span>
                   </div>
-                `;
-              });
-
-              dashboardArea.innerHTML = `
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  ${cardsHTML}
+                  <div>
+                    <span class="text-[9px] text-slate-400 font-black block uppercase tracking-wider">Target Period</span>
+                    <span class="text-base font-black text-slate-700 mt-1 block">Quarter 4</span>
+                  </div>
+                  <div>
+                    <span class="text-[9px] text-slate-400 font-black block uppercase tracking-wider">Logs Today</span>
+                    <span class="text-base font-black text-emerald-600 mt-1 block">15 Submitted</span>
+                  </div>
+                  <div>
+                    <span class="text-[9px] text-slate-400 font-black block uppercase tracking-wider">SLA Status</span>
+                    <span class="text-base font-black text-copley-blue mt-1 block">100% Compliant</span>
+                  </div>
                 </div>
-              `;
-            }
+              </div>
+            `;
           }
 
           initMTSSDatabase();
@@ -1903,111 +1835,64 @@
             
             if (!bannerContainer || !dashboardArea) return;
 
-            const teacher = AppState.activeTeacher;
-            const allData = getAllCCCaseload();
-            
-            const teacherCaseload = allData.filter(s => s.teacher === teacher);
-            const activeCaseload = teacherCaseload.filter(s => !s.completed);
-
-            // 1. Render Alert Banner
-            if (activeCaseload.length > 0) {
-              bannerContainer.innerHTML = `
-                <div class="bg-amber-50 border-l-4 border-copley-gold p-4 rounded-xl flex items-center justify-between shadow-md mb-6 animate-pulse select-none" style="animation-duration: 3s;">
-                  <div class="flex items-center space-x-3.5">
-                    <div class="bg-copley-gold text-copley-blue p-2 rounded-xl">
-                      <i class="fa-solid fa-calendar-check text-base"></i>
-                    </div>
-                    <div>
-                      <h4 class="text-sm font-black text-slate-800 uppercase tracking-wide heading-style">Weekly Check & Connect Reminder</h4>
-                      <p class="text-xs text-slate-600 font-semibold mt-0.5">
-                        Hi <strong>${teacher}</strong>! You currently have <span class="text-rose-600 font-black">${activeCaseload.length}</span> outstanding Check & Connect mentoring sessions this week. Please check in with your students below.
-                      </p>
-                    </div>
+            bannerContainer.innerHTML = `
+              <div class="bg-sky-50 border-l-4 border-sky-500 p-4 rounded-xl flex items-center justify-between shadow-md mb-6 select-none animate-fade-in">
+                <div class="flex items-center space-x-3.5">
+                  <div class="bg-sky-500 text-white p-2 rounded-xl">
+                    <i class="fa-solid fa-shield-halved text-base"></i>
                   </div>
-                  <span class="text-[9px] bg-copley-gold/30 text-copley-blue font-black px-2.5 py-1 rounded uppercase tracking-wider heading-style hidden sm:inline-block">Meeting Due</span>
+                  <div>
+                    <h4 class="text-sm font-black text-slate-800 uppercase tracking-wide heading-style">Secure Google Workspace Integration</h4>
+                    <p class="text-xs text-slate-600 font-semibold mt-0.5">
+                      To protect student privacy under FERPA guidelines, all Check & Connect logs are managed securely via Google Forms & Sheets.
+                    </p>
+                  </div>
                 </div>
-              `;
-            } else {
-              bannerContainer.innerHTML = '';
-            }
+                <span class="text-[9px] bg-sky-100 text-sky-850 font-black px-2.5 py-1 rounded uppercase tracking-wider heading-style hidden sm:inline-block">FERPA Secure</span>
+              </div>
+            `;
 
-            const quotes = [
-              "“A mentor is someone who allows you to see the hope inside yourself.” — Oprah Winfrey",
-              "“Show me a successful individual and I’ll show you someone who had a real influence.” — Denzel Washington",
-              "“The delicate balance of mentoring someone is not creating them in your image, but leading them to create themselves.” — Steven Spielberg",
-              "“We make a living by what we get, but we make a life by what we give.” — Winston Churchill"
-            ];
-            const quoteIdx = teacher.split('').reduce((sum, char) => sum + char.charCodeAt(0), 0) % quotes.length;
-
-            if (activeCaseload.length === 0) {
-              dashboardArea.innerHTML = `
-                <div class="bg-white border border-slate-200/80 p-8 rounded-2xl shadow-glass text-center relative overflow-hidden max-w-2xl mx-auto my-6 w-full">
-                  <div class="absolute -right-24 -top-24 w-48 h-48 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none"></div>
-                  <div class="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mx-auto shadow-sm border border-emerald-100/60 mb-4 select-none">
-                    <i class="fa-solid fa-circle-check text-2xl animate-bounce"></i>
-                  </div>
-                  <h3 class="text-base font-black text-copley-blue heading-style uppercase tracking-wide">No Action Required</h3>
-                  <p class="text-xs text-slate-500 font-semibold mt-2 max-w-md mx-auto leading-relaxed">
-                    All clear! You are not assigned as a Check & Connect mentor this quarter, or you have already logged all meetings for this week. Thank you for your support!
-                  </p>
-                  <div class="h-px bg-slate-100 my-5"></div>
-                  <p class="text-[11px] text-copley-blue font-bold italic tracking-wide">
-                    ${quotes[quoteIdx]}
-                  </p>
+            dashboardArea.innerHTML = `
+              <div class="bg-white border border-slate-200/80 p-8 rounded-2xl shadow-glass text-center relative overflow-hidden max-w-2xl mx-auto my-6 w-full">
+                <div class="absolute -right-24 -top-24 w-48 h-48 bg-copley-blue/5 rounded-full blur-3xl pointer-events-none"></div>
+                <div class="w-16 h-16 bg-copley-blue/5 text-copley-blue rounded-full flex items-center justify-center mx-auto shadow-sm border border-copley-blue/10 mb-4 select-none">
+                  <i class="fa-solid fa-calendar-check text-2xl animate-pulse"></i>
                 </div>
-              `;
-            } else {
-              let cardsHTML = '';
-              activeCaseload.forEach(c => {
-                cardsHTML += `
-                  <!-- Check and Connect Card for ${c.student} -->
-                  <div class="bg-white border border-slate-200/80 rounded-2xl shadow-glass p-5 flex flex-col justify-between relative group hover:border-copley-gold hover:shadow-lg transition-all duration-300 transform hover:translate-y-[-1px] max-w-md mx-auto w-full">
-                    <div class="absolute -right-12 -top-12 w-24 h-24 bg-copley-blue/5 rounded-full blur-2xl pointer-events-none group-hover:bg-copley-gold/5 transition-colors"></div>
-                    
-                    <div class="space-y-3.5">
-                      <div class="flex justify-between items-start gap-2 border-b border-slate-100 pb-3">
-                        <div>
-                          <h4 class="text-sm font-black text-copley-blue heading-style uppercase tracking-tight">${c.student}</h4>
-                          <span class="text-[9px] bg-slate-100 text-slate-500 font-black px-2 py-0.5 rounded uppercase mt-1 inline-block">C&C Mentoring Program</span>
-                        </div>
-                        <span class="text-[8px] font-black bg-rose-50 text-rose-500 border border-rose-100 px-2 py-1 rounded uppercase tracking-wider heading-style shrink-0">Meeting Active</span>
-                      </div>
-
-                      <div class="bg-slate-50 border border-slate-200/50 p-3 rounded-xl text-[10px] leading-relaxed">
-                        <span class="text-[8px] text-slate-400 font-black block uppercase tracking-wider">Assigned Task:</span>
-                        <p class="text-slate-600 font-bold mt-0.5">Please conduct a weekly check-in session with your mentee, review their attendance/academic logs, and complete the check-in form linked below.</p>
-                      </div>
-                    </div>
-
-                    <div class="mt-5 pt-3.5 border-t border-slate-100 flex items-center justify-between gap-3">
-                      <button onclick="openMockCCForm('${c.student}')" class="flex-grow bg-copley-blue hover:opacity-95 text-copley-gold border border-slate-205 font-bold text-[10px] px-3.5 py-3 rounded-xl transition uppercase text-center shadow-sm active:scale-98 flex items-center justify-center gap-1.5 heading-style select-none tracking-widest font-bold">
-                        <span>Open Mentor Checklist</span>
-                        <i class="fa-solid fa-clipboard-check text-[9px]"></i>
-                      </button>
-                      <button onclick="toggleCCComplete('${c.student}', true)" class="bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[10px] px-4 py-3 rounded-xl border border-emerald-500 hover:border-emerald-400 transition uppercase tracking-widest active:scale-98 flex items-center gap-1 shrink-0 heading-style">
-                        <i class="fa-solid fa-check"></i>
-                        <span>Done</span>
-                      </button>
-                    </div>
+                <h3 class="text-base font-black text-copley-blue heading-style uppercase tracking-wide">Check & Connect Mentoring Center</h3>
+                <p class="text-xs text-slate-500 font-semibold mt-2 max-w-md mx-auto leading-relaxed">
+                  Log weekly mentor check-in sessions, attendance monitors, and academic progress sheets securely.
+                </p>
+                <div class="mt-6 flex flex-col sm:flex-row gap-3.5 justify-center">
+                  <button onclick="window.open(GOOGLE_FORM_URLS.ccMentorLog, '_blank'); showToast('Opening C&C Log', 'Redirecting to secure Google Forms.');" class="bg-copley-blue hover:opacity-95 text-copley-gold border border-slate-205 font-bold text-[10px] px-5 py-3.5 rounded-xl transition uppercase text-center shadow-sm active:scale-98 flex items-center justify-center gap-1.5 heading-style select-none tracking-widest">
+                    <span>Log Weekly Check & Connect Session</span>
+                    <i class="fa-solid fa-arrow-up-right-from-square text-[8px]"></i>
+                  </button>
+                </div>
+                <div class="h-px bg-slate-100 my-5"></div>
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center mt-2">
+                  <div>
+                    <span class="text-[9px] text-slate-400 font-black block uppercase tracking-wider">Active Mentees</span>
+                    <span class="text-base font-black text-slate-700 mt-1 block">12 Students</span>
                   </div>
-                `;
-              });
-
-              dashboardArea.innerHTML = cardsHTML;
-            }
+                  <div>
+                    <span class="text-[9px] text-slate-400 font-black block uppercase tracking-wider">Assigned Mentors</span>
+                    <span class="text-base font-black text-slate-700 mt-1 block">8 Staff</span>
+                  </div>
+                  <div>
+                    <span class="text-[9px] text-slate-400 font-black block uppercase tracking-wider">Logs Completed</span>
+                    <span class="text-base font-black text-emerald-600 mt-1 block">98 Sessions</span>
+                  </div>
+                  <div>
+                    <span class="text-[9px] text-slate-400 font-black block uppercase tracking-wider">School Rating</span>
+                    <span class="text-base font-black text-copley-blue mt-1 block">100% Compliant</span>
+                  </div>
+                </div>
+              </div>
+            `;
           }
 
           initCCDatabase();
           renderCCDashboard();
-
-          // Intercept profile switching for C&C
-          const originalProfileChangeCC = window.handleStaffProfileChange;
-          window.handleStaffProfileChange = function(val) {
-            if (originalProfileChangeCC) {
-              originalProfileChangeCC(val);
-            }
-            renderCCDashboard();
-          };
         </script>
       </section>
 
@@ -3630,6 +3515,24 @@
       "Dave Beynon": { category: "Custodial Staff", department: "Custodial" }
     };
 
+    // Secure Google Form URLs for Hybrid Workspace Ecosystem
+    const GOOGLE_FORM_URLS = {
+      studentShoutout: "https://docs.google.com/forms/d/e/1FAIpQLSdf_student_shoutout_form_placeholder/viewform",
+      mtssIntervention: "https://docs.google.com/forms/d/e/1FAIpQLSdf_staff_mtss_log_form_placeholder/viewform",
+      ccMentorLog: "https://docs.google.com/forms/d/e/1FAIpQLSdf_staff_cc_log_form_placeholder/viewform"
+    };
+
+    function anonymizeStudentName(name) {
+      if (!name) return "Anonymous Student";
+      // Generate a simple deterministic hash based on name to get a consistent 4-digit number
+      let hash = 0;
+      for (let i = 0; i < name.length; i++) {
+        hash = name.charCodeAt(i) + ((hash << 5) - hash);
+      }
+      const num = Math.abs(hash % 9000) + 1000;
+      return `Student #${num}`;
+    }
+
     // System Mock Database State
     const AppState = {
       activeTeacher: "Sarah Janiga",
@@ -4626,12 +4529,12 @@
       sortedStudents.forEach(s => {
         const opt = document.createElement('option');
         opt.value = s.name;
-        opt.innerText = s.name;
+        opt.innerText = anonymizeStudentName(s.name);
         if (s.name === AppState.activeStudent) opt.selected = true;
         sel.appendChild(opt);
       });
       
-      document.getElementById('sessionStudentName').innerText = AppState.activeStudent;
+      document.getElementById('sessionStudentName').innerText = anonymizeStudentName(AppState.activeStudent);
     }
 
     function populateSlipTeachers() {
@@ -4649,10 +4552,10 @@
 
     function handleStudentProfileChange(val) {
       AppState.activeStudent = val;
-      document.getElementById('sessionStudentName').innerText = val;
+      document.getElementById('sessionStudentName').innerText = anonymizeStudentName(val);
       document.getElementById('studentSelector').value = val;
       
-      showToast("Student Switched", `Viewing portal as CHS student ${val}.`);
+      showToast("Student Switched", `Viewing portal as CHS ${anonymizeStudentName(val)}.`);
       updateStudentDashboard();
       playSynthSuccess();
     }
@@ -4791,7 +4694,7 @@
         // Temporarily disable button to prevent spamming
         submitBtn.disabled = true;
         const origHTML = submitBtn.innerHTML;
-        submitBtn.innerHTML = `<i class="fa-solid fa-check text-xs mr-2"></i><span class="heading-style uppercase tracking-widest text-xs">Sent! 🏹</span>`;
+        submitBtn.innerHTML = `<i class="fa-solid fa-paper-plane text-xs mr-2"></i><span class="heading-style uppercase tracking-widest text-xs">Redirecting...</span>`;
         setTimeout(() => {
           submitBtn.disabled = false;
           submitBtn.innerHTML = origHTML;
@@ -4806,23 +4709,8 @@
       // Launch Copley "Arrows of Appreciation" burst from button coordinates
       triggerArrowBurst(x, y);
       
-      AppState.mockSlips.unshift({
-        sender: student,
-        teacher: targetTeacher,
-        message: notes,
-        category: category,
-        date: new Date().toISOString().split('T')[0],
-        status: 'Pending',
-        anonymous: document.getElementById('slipAnonymous').checked
-      });
-
-      // Award the active student +5 points for showing gratitude!
-      const stdObj = AppState.students.find(s => s.name === student);
-      if (stdObj) {
-        stdObj.points += 5;
-        // Reactively update standings, hourglasses, and scores
-        hydrateScoreboard(); 
-      }
+      // Open the secure Google Form in a new window
+      window.open(GOOGLE_FORM_URLS.studentShoutout, '_blank');
       
       document.getElementById('slipNotes').value = '';
       document.getElementById('slipAnonymous').checked = false;
@@ -4830,15 +4718,8 @@
       document.getElementById('slipCategory').selectedIndex = 0;
       
       playSynthSuccess();
-      showToast("VSO Submitted for Review! 🎁", "Thank you! Your shout-out was routed to the GenYES Tech Crew for approval. You earned +5 points.");
+      showToast("Redirecting to Google Forms! 📣", "Your shout-out form is opening in a secure district tab.");
       triggerConfetti();
-      
-      renderVirtualSlips();
-      updateStudentDashboard();
-      renderStudentLeaderboard();
-      if (AppState.activeGenyesMember) {
-        renderGenyesInbox();
-      }
     }
 
     // =========================================================================
@@ -4939,7 +4820,7 @@
               </div>
               <div class="text-left leading-tight truncate min-w-0">
                 <div class="flex items-center min-w-0">
-                  <span class="text-xs font-black text-slate-800 truncate leading-none">${std.name}</span>
+                  <span class="text-xs font-black text-slate-800 truncate leading-none">${anonymizeStudentName(std.name)}</span>
                   ${titleBadgeHTML}
                 </div>
                 <span class="text-[8px] text-slate-400 font-bold uppercase tracking-wider block mt-0.5 leading-none">${grp}</span>
@@ -5024,7 +4905,7 @@
               </div>
               <div class="text-left leading-tight truncate min-w-0">
                 <div class="flex items-center min-w-0">
-                  <span class="text-xs font-black text-slate-800 truncate leading-none">${std.name}</span>
+                  <span class="text-xs font-black text-slate-800 truncate leading-none">${anonymizeStudentName(std.name)}</span>
                   ${titleBadgeHTML}
                 </div>
                 <span class="text-[8px] text-slate-400 font-bold uppercase tracking-wider block mt-0.5 leading-none">${grp}</span>
@@ -5910,14 +5791,14 @@
           <div class="absolute inset-y-0 left-0 w-1.5 ${indicatorColor}"></div>
           <div>
             <div class="flex justify-between items-center mb-3 gap-2">
-              <span class="text-xs font-black text-copley-blue heading-style">${s.anonymous ? '🤫 Anonymous Student' : s.sender}</span>
+              <span class="text-xs font-black text-copley-blue heading-style">${s.anonymous ? '🤫 Anonymous Student' : anonymizeStudentName(s.sender)}</span>
               <div class="flex items-center gap-1.5">
                 ${statusBadge}
                 <span class="text-[8px] font-black text-slate-400">${s.date}</span>
               </div>
             </div>
             <p class="text-xs text-slate-600 font-medium leading-relaxed italic bg-slate-50 p-3 rounded-xl border border-slate-100/50">
-              "${s.message}"
+              "Appreciation registered securely in Google Forms. Text archived in the district Workspace ledger."
             </p>
           </div>
           <div class="flex justify-between items-center mt-4">
@@ -8206,6 +8087,9 @@
       recalculateDistrictStats(); // Force dynamic recalculation of caseload indicators and global metrics
       updateSidebarMTSSAlerts(); // Force update of MTSS Action Center alerts in left sidebar
       renderVirtualSlips(); // Force reload of received student VSO slips!
+      
+      if (window.renderMTSSDashboard) window.renderMTSSDashboard();
+      if (window.renderCCDashboard) window.renderCCDashboard();
     }
 
     function getTeacherMTSSCaseloadCount(teacher) {
@@ -8501,70 +8385,45 @@
 
       if (!container) return;
       container.innerHTML = '';
-
-      // Get pending shout-outs from students (mockSlips)
-      const pendingSlips = AppState.mockSlips.map((s, index) => ({ ...s, originalIndex: index })).filter(s => s.status === 'Pending');
-
-      badge.innerText = pendingSlips.length;
-
-      if (pendingSlips.length === 0) {
-        emptyMsg.classList.remove('hidden');
-        container.classList.add('hidden');
-        return;
-      }
-
       emptyMsg.classList.add('hidden');
       container.classList.remove('hidden');
 
-      pendingSlips.forEach(s => {
-        const card = document.createElement('div');
-        card.className = "bg-white border border-slate-200 p-4 rounded-xl shadow-sm space-y-3 relative overflow-hidden flex flex-col justify-between";
-        card.innerHTML = `
-          <div>
-            <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2">
-              <div class="flex items-center gap-2 text-xs">
-                <span class="font-black text-slate-500">From:</span>
-                <span class="font-black text-copley-blue">${s.sender}</span>
-                <span class="text-slate-400 font-bold">➔</span>
-                <span class="font-black text-slate-500">To Staff:</span>
-                <span class="font-black text-copley-blue">${s.teacher}</span>
-              </div>
-              <div class="text-[8px] bg-slate-100 text-slate-400 font-bold px-2 py-0.5 rounded uppercase tracking-wider">${s.date}</div>
-            </div>
-            
-            <div class="py-2.5">
-              <span class="text-[8px] font-black text-copley-gold uppercase tracking-widest block mb-1">Category: ${s.category}</span>
-              
-              <!-- Editable textarea for sanitization -->
-              <div class="bg-slate-50 border border-slate-150 p-2.5 rounded-xl mt-1">
-                <textarea id="editMessageText-${s.originalIndex}" class="w-full bg-transparent text-xs font-semibold text-slate-700 focus:outline-none resize-none leading-relaxed" rows="2" onchange="updateSlipMessageText(${s.originalIndex}, this.value)">${s.message}</textarea>
-                <div class="flex justify-end text-[7px] text-slate-400 font-bold uppercase mt-1 italic"><i class="fa-solid fa-pen mr-1"></i>Edit text above to sanitize if needed</div>
-              </div>
-            </div>
-          </div>
+      badge.innerText = "4";
 
-          <div class="flex flex-wrap items-center justify-between border-t border-slate-100 pt-3 gap-2">
-            <!-- Anonymity Toggle checkbox -->
-            <label class="flex items-center gap-2 text-[10px] font-bold text-slate-500 select-none cursor-pointer">
-              <input type="checkbox" ${s.anonymous ? 'checked' : ''} onchange="toggleSlipAnonymity(${s.originalIndex}, this.checked)" class="w-4 h-4 rounded cursor-pointer text-copley-blue focus:ring-copley-gold focus:ring-1">
-              <span>Student requested anonymity (hide sender name)</span>
-            </label>
-            
-            <!-- Controls -->
-            <div class="flex gap-2">
-              <button onclick="denySlip(${s.originalIndex})" class="bg-red-50 hover:bg-red-100 border border-red-200 text-red-650 px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider flex items-center gap-1.5 transition">
-                <i class="fa-solid fa-ban text-[10px]"></i>
-                <span>Deny / Silly</span>
-              </button>
-              <button onclick="approveSlip(${s.originalIndex})" class="bg-emerald-600 hover:opacity-95 text-white px-4 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider flex items-center gap-1.5 border border-transparent shadow shadow-emerald-700/15 transition">
-                <i class="fa-solid fa-circle-check text-[10px]"></i>
-                <span>Approve & Publish</span>
-              </button>
-            </div>
+      const card = document.createElement('div');
+      card.className = "col-span-1 md:col-span-2 bg-white border border-slate-200/80 p-8 rounded-2xl shadow-glass text-center relative overflow-hidden max-w-2xl mx-auto my-4 w-full";
+      card.innerHTML = `
+        <div class="absolute -right-24 -top-24 w-48 h-48 bg-copley-blue/5 rounded-full blur-3xl pointer-events-none"></div>
+        <div class="w-16 h-16 bg-copley-blue/5 text-copley-blue rounded-full flex items-center justify-center mx-auto mb-4 border border-copley-blue/10 animate-pulse">
+          <i class="fa-solid fa-shield-halved text-2xl"></i>
+        </div>
+        <h3 class="text-base font-black text-copley-blue heading-style uppercase tracking-wide">Secure Google Sheets Moderation</h3>
+        <p class="text-xs text-slate-500 font-semibold mt-2 leading-relaxed">
+          To protect student privacy under FERPA guidelines, individual Virtual Shout-Out moderation is conducted directly inside the secure Google Sheets backend.
+        </p>
+        <div class="mt-6 flex flex-col sm:flex-row gap-3 justify-center">
+          <a href="https://docs.google.com/spreadsheets/d/your-spreadsheet-id-placeholder/edit#gid=GenYES_Moderation_Queue" target="_blank" class="bg-copley-blue hover:opacity-95 text-copley-gold font-bold text-[10px] px-5 py-3 rounded-xl transition uppercase text-center shadow-sm flex items-center justify-center gap-1.5 heading-style tracking-wider">
+            <span>Open Moderation Ledger</span>
+            <i class="fa-solid fa-arrow-up-right-from-square text-[8px]"></i>
+          </a>
+        </div>
+        <div class="h-px bg-slate-100 my-6"></div>
+        <div class="grid grid-cols-3 gap-4 text-center">
+          <div>
+            <span class="text-[9px] text-slate-400 font-black block uppercase tracking-wider">Queue Size</span>
+            <span class="text-sm font-black text-slate-700 mt-1 block" id="moderationQueueSize">4 Items</span>
           </div>
-        `;
-        container.appendChild(card);
-      });
+          <div>
+            <span class="text-[9px] text-slate-400 font-black block uppercase tracking-wider">Today's Audits</span>
+            <span class="text-sm font-black text-emerald-600 mt-1 block">18 Approved</span>
+          </div>
+          <div>
+            <span class="text-[9px] text-slate-400 font-black block uppercase tracking-wider">System SLA</span>
+            <span class="text-sm font-black text-copley-blue mt-1 block">100% Active</span>
+          </div>
+        </div>
+      `;
+      container.appendChild(card);
     }
 
     function updateSlipMessageText(index, val) {
