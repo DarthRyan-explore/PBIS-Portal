@@ -216,11 +216,14 @@ function sendWeeklyDigest() {
     // Safety check: if they have no email configured, skip
     if (!stats.email) continue;
     
-    var mtssCount = outstandingReminders[staffName] || 0;
-    var htmlBody = compileStaffDigestHTML(staffName, stats.received, mtssCount);
+    // Check if staff classification is Teacher (support staff don't do MTSS strategy reviews)
+    var isTeacher = stats.classification ? stats.classification.toLowerCase().indexOf("teacher") !== -1 : true;
+    var mtssCount = isTeacher ? (outstandingReminders[staffName] || 0) : 0;
+    
+    var htmlBody = compileStaffDigestHTML(staffName, stats.received, mtssCount, isTeacher);
     
     if (CONFIG.DEBUG_MODE) {
-      Logger.log("[DEBUG MODE] Would send email to: " + stats.email + " with Subject: Weekly PBIS Digest");
+      Logger.log("[DEBUG MODE] Would send email to: " + stats.email + " with Subject: Weekly PBIS Digest (Teacher: " + isTeacher + ")");
     } else {
       MailApp.sendEmail({
         to: stats.email,
@@ -239,27 +242,31 @@ function sendWeeklyDigest() {
 /**
  * Compiles a beautifully formatted Copley High School HTML newsletter for Staff
  */
-function compileStaffDigestHTML(name, praiseCount, mtssCount) {
+function compileStaffDigestHTML(name, praiseCount, mtssCount, isTeacher) {
+  isTeacher = isTeacher !== false; // Default to true if not specified
   var mtssSection = "";
-  if (mtssCount > 0) {
-    mtssSection = [
-      '<div style="background-color: #fff1f2; border: 1px solid #fecdd3; border-radius: 12px; padding: 15px; margin-top: 20px;">',
-      '  <h3 style="color: #be123c; margin-top: 0; font-family: sans-serif; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px;">⚠️ Minor Detail (Action Required)</h3>',
-      '  <p style="color: #4b5563; font-size: 13px; margin: 5px 0; line-height: 1.5;">',
-      '    Look, we all love paperwork. Okay, maybe not. But you currently have <strong>' + mtssCount + '</strong> outstanding student MTSS Tier 1 strategy logs due. Let\'s get these documented so we can pretend we have our lives completely together.',
-      '  </p>',
-      '  <a href="https://docs.google.com/forms/d/e/1FAIpQLSdf_staff_mtss_log_form_placeholder/viewform" target="_blank" style="background-color: #be123c; color: white; padding: 8px 15px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 11px; display: inline-block; margin-top: 8px; text-transform: uppercase; letter-spacing: 0.5px;">Log Strategies</a>',
-      '</div>'
-    ].join('\n');
-  } else {
-    mtssSection = [
-      '<div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 15px; margin-top: 20px;">',
-      '  <h3 style="color: #15803d; margin-top: 0; font-family: sans-serif; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px;">✅ MTSS Review Status: Clear</h3>',
-      '  <p style="color: #4b5563; font-size: 13px; margin: 0; line-height: 1.5;">',
-      '    Look at you. Zero outstanding MTSS logs. Go buy yourself a coffee, or take an extra long deep breath. You earned it.',
-      '  </p>',
-      '</div>'
-    ].join('\n');
+  
+  if (isTeacher) {
+    if (mtssCount > 0) {
+      mtssSection = [
+        '<div style="background-color: #fff1f2; border: 1px solid #fecdd3; border-radius: 12px; padding: 15px; margin-top: 20px;">',
+        '  <h3 style="color: #be123c; margin-top: 0; font-family: sans-serif; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px;">⚠️ Minor Detail (Action Required)</h3>',
+        '  <p style="color: #4b5563; font-size: 13px; margin: 5px 0; line-height: 1.5;">',
+        '    Look, we all love paperwork. Okay, maybe not. But you currently have <strong>' + mtssCount + '</strong> outstanding student MTSS Tier 1 strategy logs due. Let\'s get these documented so we can pretend we have our lives completely together.',
+        '  </p>',
+        '  <a href="https://docs.google.com/forms/d/e/1FAIpQLSdf_staff_mtss_log_form_placeholder/viewform" target="_blank" style="background-color: #be123c; color: white; padding: 8px 15px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 11px; display: inline-block; margin-top: 8px; text-transform: uppercase; letter-spacing: 0.5px;">Log Strategies</a>',
+        '</div>'
+      ].join('\n');
+    } else {
+      mtssSection = [
+        '<div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 15px; margin-top: 20px;">',
+        '  <h3 style="color: #15803d; margin-top: 0; font-family: sans-serif; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px;">✅ MTSS Review Status: Clear</h3>',
+        '  <p style="color: #4b5563; font-size: 13px; margin: 0; line-height: 1.5;">',
+        '    Look at you. Zero outstanding MTSS logs. Go buy yourself a coffee, or take an extra long deep breath. You earned it.',
+        '  </p>',
+        '</div>'
+      ].join('\n');
+    }
   }
 
   // Witty greeting sentences (Ryan Reynolds style)
@@ -795,7 +802,8 @@ function getStaffDirectory() {
       staff[s] = { 
         name: s, 
         email: s.toLowerCase().replace(" ", ".") + "@" + CONFIG.DISTRICT_DOMAIN, 
-        dept: "General Staff" 
+        dept: "General Staff",
+        classification: "Teacher"
       };
     });
     return staff;
@@ -804,17 +812,51 @@ function getStaffDirectory() {
   var data = sheet.getDataRange().getValues();
   if (data.length <= 1) return staff;
   
-  // Columns: [0] Staff Name, [1] Email, [2] Department
+  // Resolve column indexes dynamically from headers in Row 1
+  var headers = data[0];
+  var emailColIdx = -1;
+  var deptColIdx = -1;
+  var firstColIdx = -1;
+  var lastColIdx = -1;
+  var classColIdx = -1;
+  
+  for (var c = 0; c < headers.length; c++) {
+    var h = headers[c].toString().toLowerCase().trim();
+    if (h.indexOf("email") !== -1) emailColIdx = c;
+    else if (h.indexOf("dept") !== -1 || h.indexOf("role") !== -1) deptColIdx = c;
+    else if (h.indexOf("first") !== -1) firstColIdx = c;
+    else if (h.indexOf("last") !== -1) lastColIdx = c;
+    else if (h.indexOf("class") !== -1 || h.indexOf("type") !== -1) classColIdx = c;
+  }
+  
+  // Fallbacks if headers are not clearly matching
+  if (firstColIdx === -1) firstColIdx = 1; // Default to Column B
+  if (lastColIdx === -1) lastColIdx = 0;   // Default to Column A
+  if (classColIdx === -1) classColIdx = 2; // Default to Column C
+  if (deptColIdx === -1) deptColIdx = 3;   // Default to Column D
+  
   for (var i = 1; i < data.length; i++) {
-    var name = data[i][0] ? data[i][0].toString().trim() : "";
-    var email = data[i][1] ? data[i][1].toString().trim().toLowerCase() : "";
-    var dept = data[i][2] ? data[i][2].toString().trim() : "General Staff";
+    var fName = data[i][firstColIdx] ? data[i][firstColIdx].toString().trim() : "";
+    var lName = data[i][lastColIdx] ? data[i][lastColIdx].toString().trim() : "";
+    var name = (fName + " " + lName).trim();
+    
+    // Auto-generate fallback email if the email column doesn't exist or is empty
+    var email = "";
+    if (emailColIdx !== -1 && data[i][emailColIdx]) {
+      email = data[i][emailColIdx].toString().trim().toLowerCase();
+    } else if (fName && lName) {
+      email = (fName + "." + lName).toLowerCase().replace(/\s+/g, "") + "@" + CONFIG.DISTRICT_DOMAIN;
+    }
+    
+    var dept = deptColIdx !== -1 && data[i][deptColIdx] ? data[i][deptColIdx].toString().trim() : "General Staff";
+    var classification = classColIdx !== -1 && data[i][classColIdx] ? data[i][classColIdx].toString().trim() : "Teacher";
     
     if (name) {
       staff[name] = {
         name: name,
         email: email,
-        dept: dept
+        dept: dept,
+        classification: classification
       };
     }
   }
