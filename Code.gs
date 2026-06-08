@@ -18,23 +18,24 @@ var CONFIG = {
   MTSS_SHEET_NAME: "MTSS_Interventions_Log",
   CC_SHEET_NAME: "Check_Connect_Logs",
   DISTRICT_DOMAIN: "copley-fairlawn.org",
-  EMAIL_SENDER_NAME: "Copley High School PBIS System"
+  EMAIL_SENDER_NAME: "Copley High School PBIS System",
+  DEBUG_MODE: true // SAFETY GATE: Set to true to prevent sending live emails during testing
 };
 
-// Hardcoded Student-to-House mapping for validation (or falls back to sheet lookup)
+// Hardcoded Student-to-House (Grade Cohort) mapping for validation/fallbacks
 var STUDENT_HOUSE_MAPPING = {
-  "Frodo Baggins": "Copley",
-  "Ahsoka Tano": "Fairlawn",
-  "Luke Skywalker": "Copley",
-  "Jean Grey": "Fairlawn",
-  "Peter Parker": "Copley",
-  "Arwen Undomiel": "Fairlawn",
-  "Dragonborn": "Copley",
-  "Anakin Skywalker": "Fairlawn",
-  "Gwen Stacy": "Copley",
-  "Legolas Greenleaf": "Fairlawn",
-  "Samwise Gamgee": "Copley",
-  "Spock": "Fairlawn"
+  "Frodo Baggins": "Seniors",
+  "Ahsoka Tano": "Juniors",
+  "Luke Skywalker": "Sophomores",
+  "Jean Grey": "Juniors",
+  "Peter Parker": "Freshmen",
+  "Arwen Undomiel": "Seniors",
+  "Dragonborn": "Freshmen",
+  "Anakin Skywalker": "Sophomores",
+  "Gwen Stacy": "Seniors",
+  "Legolas Greenleaf": "Juniors",
+  "Samwise Gamgee": "Sophomores",
+  "Spock": "Freshmen"
 };
 
 /**
@@ -78,8 +79,8 @@ function processShoutoutSubmission(values) {
   
   Logger.log("Processing Shout-out from " + sender + " (" + email + ") to " + teacher);
   
-  // Resolve House mapping
-  var house = STUDENT_HOUSE_MAPPING[sender] || "Copley"; // Default fallback
+  // Resolve House (Grade Cohort) mapping using Roster lookup
+  var house = lookupStudentGrade(email, sender);
   
   // 1. Log transaction to House Cup ledger
   updateHouseCupLedger(ss, house, 5); // +5 Points for submitting a shoutout
@@ -117,8 +118,10 @@ function updateHouseCupLedger(ss, houseName, pointsToAdd) {
     ledgerSheet = ss.insertSheet(CONFIG.LEDGER_SHEET_NAME);
     ledgerSheet.appendRow(["House Name", "Total Points", "Last Updated"]);
     ledgerSheet.getRange(1, 1, 1, 3).setFontWeight("bold");
-    ledgerSheet.appendRow(["Copley", 0, new Date()]);
-    ledgerSheet.appendRow(["Fairlawn", 0, new Date()]);
+    ledgerSheet.appendRow(["Seniors", 0, new Date()]);
+    ledgerSheet.appendRow(["Juniors", 0, new Date()]);
+    ledgerSheet.appendRow(["Sophomores", 0, new Date()]);
+    ledgerSheet.appendRow(["Freshmen", 0, new Date()]);
   }
   
   var dataRange = ledgerSheet.getDataRange();
@@ -201,12 +204,16 @@ function sendWeeklyDigest() {
     
     var htmlBody = compileStaffDigestHTML(staffName, stats.received, mtssCount);
     
-    MailApp.sendEmail({
-      to: stats.email,
-      subject: "Weekly PBIS Digest - Friday Appreciation & Caseload Summary 🏹",
-      htmlBody: htmlBody,
-      name: CONFIG.EMAIL_SENDER_NAME
-    });
+    if (CONFIG.DEBUG_MODE) {
+      Logger.log("[DEBUG MODE] Would send email to: " + stats.email + " with Subject: Weekly PBIS Digest");
+    } else {
+      MailApp.sendEmail({
+        to: stats.email,
+        subject: "Weekly PBIS Digest - Friday Appreciation & Caseload Summary 🏹",
+        htmlBody: htmlBody,
+        name: CONFIG.EMAIL_SENDER_NAME
+      });
+    }
     
     Logger.log("Sent weekly digest email to " + stats.email);
   }
@@ -420,8 +427,10 @@ function processStudentData(student, teacherGroups) {
 function calculateHousePoints(slips, pepOverrides) {
   var results = {
     houses: {
-      "Copley": 0,
-      "Fairlawn": 0
+      "Seniors": 0,
+      "Juniors": 0,
+      "Sophomores": 0,
+      "Freshmen": 0
     },
     departments: {}
   };
@@ -499,12 +508,12 @@ function calculateHousePoints(slips, pepOverrides) {
     if (receiverIsStudent) {
       // Staff-to-Student Praise Slip
       isStaffToStudent = true;
-      studentHouse = STUDENT_HOUSE_MAPPING[receiverName] || "Copley";
+      studentHouse = STUDENT_HOUSE_MAPPING[receiverName] || "Freshmen";
       staffName = senderName;
       pointsToHouse = 10; // Student VSO received = 10 pts
     } else {
       // Student-to-Staff Shoutout
-      studentHouse = STUDENT_HOUSE_MAPPING[senderName] || "Copley";
+      studentHouse = STUDENT_HOUSE_MAPPING[senderName] || "Freshmen";
       staffName = receiverName;
       pointsToHouse = 2; // Student VSO sent = 2 pts
     }
@@ -632,6 +641,111 @@ function updateFeaturedShoutOutSlides(presentationId, limit) {
   } catch (err) {
     Logger.log("Failed to update Google Slides: " + err.toString());
   }
+}
+
+/**
+ * Looks up a student's Grade/House in the Master_Roster tab by email or name.
+ * Supports auto-resolving columns based on spreadsheet headers.
+ *
+ * Roster Sheet Layout expected:
+ * - Column A: First Name
+ * - Column B: Last Name
+ * - Column C: Email
+ * - Column D: Grade (9, 10, 11, 12)
+ *
+ * @param {string} email The verified email address from form submission.
+ * @param {string} name The reconstructed sender full name.
+ * @returns {string} The resolved House name (Seniors, Juniors, Sophomores, Freshmen).
+ */
+function lookupStudentGrade(email, name) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var rosterSheet = ss.getSheetByName("Master_Roster");
+  if (!rosterSheet) {
+    // If the roster sheet doesn't exist yet, fall back to our hardcoded map
+    Logger.log("Master_Roster sheet tab not found. Using hardcoded STUDENT_HOUSE_MAPPING fallback.");
+    return STUDENT_HOUSE_MAPPING[name] || "Freshmen";
+  }
+  
+  var data = rosterSheet.getDataRange().getValues();
+  if (data.length <= 1) {
+    return STUDENT_HOUSE_MAPPING[name] || "Freshmen";
+  }
+  
+  // Resolve column indexes dynamically from headers
+  var headers = data[0];
+  var emailColIdx = -1;
+  var gradeColIdx = -1;
+  var firstColIdx = -1;
+  var lastColIdx = -1;
+  
+  for (var c = 0; c < headers.length; c++) {
+    var h = headers[c].toString().toLowerCase().trim();
+    if (h.indexOf("email") !== -1) emailColIdx = c;
+    else if (h.indexOf("grade") !== -1 || h.indexOf("house") !== -1 || h.indexOf("class") !== -1) gradeColIdx = c;
+    else if (h.indexOf("first") !== -1) firstColIdx = c;
+    else if (h.indexOf("last") !== -1) lastColIdx = c;
+  }
+  
+  // Fallbacks if headers are not clearly matching
+  if (emailColIdx === -1) emailColIdx = 2; // Default to Column C
+  if (gradeColIdx === -1) gradeColIdx = 3; // Default to Column D
+  
+  // 1. Try email lookup (most secure, no typos)
+  if (email) {
+    var cleanEmail = email.trim().toLowerCase();
+    for (var r = 1; r < data.length; r++) {
+      var rowEmail = data[r][emailColIdx] ? data[r][emailColIdx].toString().trim().toLowerCase() : "";
+      if (rowEmail === cleanEmail) {
+        return normalizeGradeToHouse(data[r][gradeColIdx]);
+      }
+    }
+  }
+  
+  // 2. Try name lookup (if email wasn't matched)
+  if (name) {
+    var cleanName = name.trim().toLowerCase();
+    for (var r = 1; r < data.length; r++) {
+      var fName = firstColIdx !== -1 && data[r][firstColIdx] ? data[r][firstColIdx].toString().trim() : "";
+      var lName = lastColIdx !== -1 && data[r][lastColIdx] ? data[r][lastColIdx].toString().trim() : "";
+      
+      // Fallback if name is in a single column
+      if (firstColIdx === -1 && lastColIdx === -1) {
+        var rowName = data[r][0] ? data[r][0].toString().trim().toLowerCase() : "";
+        if (rowName === cleanName) {
+          return normalizeGradeToHouse(data[r][gradeColIdx]);
+        }
+      } else {
+        var fullName = (fName + " " + lName).trim().toLowerCase();
+        if (fullName === cleanName) {
+          return normalizeGradeToHouse(data[r][gradeColIdx]);
+        }
+      }
+    }
+  }
+  
+  // 3. Fallback to hardcoded list, then to Freshmen
+  return STUDENT_HOUSE_MAPPING[name] || "Freshmen";
+}
+
+/**
+ * Normalizes grade integers or descriptions to matching UI House names.
+ */
+function normalizeGradeToHouse(gradeVal) {
+  if (!gradeVal) return "Freshmen";
+  var g = gradeVal.toString().trim().toLowerCase();
+  
+  if (g === "9" || g.indexOf("9th") !== -1 || g.indexOf("fresh") !== -1) return "Freshmen";
+  if (g === "10" || g.indexOf("10th") !== -1 || g.indexOf("sopho") !== -1) return "Sophomores";
+  if (g === "11" || g.indexOf("11th") !== -1 || g.indexOf("junior") !== -1) return "Juniors";
+  if (g === "12" || g.indexOf("12th") !== -1 || g.indexOf("senior") !== -1) return "Seniors";
+  
+  // Return input directly if it matches our houses
+  var capitalize = g.charAt(0).toUpperCase() + g.slice(1);
+  if (["Seniors", "Juniors", "Sophomores", "Freshmen"].indexOf(capitalize) !== -1) {
+    return capitalize;
+  }
+  
+  return "Freshmen";
 }
 
 
