@@ -163,26 +163,38 @@ function sendWeeklyDigest() {
   var shoutouts = shoutoutSheet.getDataRange().getValues();
   var mtssLogs = mtssSheet ? mtssSheet.getDataRange().getValues() : [];
   
+  // Resolve headers to find the Target Teacher column index dynamically
+  var headers = shoutouts[0];
+  var teacherColIdx = -1;
+  for (var c = 0; c < headers.length; c++) {
+    var h = headers[c].toString().toLowerCase().trim();
+    if (h.indexOf("staff") !== -1 || h.indexOf("teacher") !== -1) {
+      teacherColIdx = c;
+      break;
+    }
+  }
+  if (teacherColIdx === -1) teacherColIdx = 4; // Default to Column E (index 4)
+  
   // Filter for records submitted in the last 7 days
   var now = new Date();
   var oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
   
   var weeklyShoutoutsCount = 0;
-  var staffRecipients = {}; // { "Teacher Name": { sent: 0, received: 0, email: "" } }
   
-  // Initialize some staff members based on staff directory rules
-  var defaultStaff = ["Sarah Janiga", "Lee Malcolm", "Maggie Steffen", "Amy Gray", "Tim Oden"];
-  defaultStaff.forEach(function(s) {
-    staffRecipients[s] = { sent: 0, received: 0, email: s.toLowerCase().replace(" ", ".") + "@" + CONFIG.DISTRICT_DOMAIN };
-  });
+  // Load staff recipients dynamically from the Staff_Directory sheet tab
+  var staffRecipients = getStaffDirectory();
+  
+  // Reset/Initialize weekly counters
+  for (var name in staffRecipients) {
+    staffRecipients[name].received = 0;
+  }
 
-  // Count weekly givers and receivers
+  // Count weekly shout-outs
   for (var i = 1; i < shoutouts.length; i++) {
     var ts = new Date(shoutouts[i][0]);
     if (ts >= oneWeekAgo) {
       weeklyShoutoutsCount++;
-      var sender = shoutouts[i][1];
-      var receiver = shoutouts[i][2];
+      var receiver = shoutouts[i][teacherColIdx] ? shoutouts[i][teacherColIdx].toString().trim() : "";
       
       if (staffRecipients[receiver]) {
         staffRecipients[receiver].received++;
@@ -200,8 +212,11 @@ function sendWeeklyDigest() {
   // Send digests to staff
   for (var staffName in staffRecipients) {
     var stats = staffRecipients[staffName];
-    var mtssCount = outstandingReminders[staffName] || 0;
     
+    // Safety check: if they have no email configured, skip
+    if (!stats.email) continue;
+    
+    var mtssCount = outstandingReminders[staffName] || 0;
     var htmlBody = compileStaffDigestHTML(staffName, stats.received, mtssCount);
     
     if (CONFIG.DEBUG_MODE) {
@@ -215,7 +230,7 @@ function sendWeeklyDigest() {
       });
     }
     
-    Logger.log("Sent weekly digest email to " + stats.email);
+    Logger.log("Processed weekly digest email to " + stats.email);
   }
   
   Logger.log("Weekly Digest transmission complete. Total shout-outs parsed: " + weeklyShoutoutsCount);
@@ -229,23 +244,31 @@ function compileStaffDigestHTML(name, praiseCount, mtssCount) {
   if (mtssCount > 0) {
     mtssSection = [
       '<div style="background-color: #fff1f2; border: 1px solid #fecdd3; border-radius: 12px; padding: 15px; margin-top: 20px;">',
-      '  <h3 style="color: #be123c; margin-top: 0; font-family: sans-serif; font-size: 14px; text-transform: uppercase;">⚠️ Outstanding Action Items</h3>',
-      '  <p style="color: #4b5563; font-size: 12px; margin: 5px 0;">',
-      '    You currently have <strong>' + mtssCount + '</strong> outstanding student MTSS Tier 1 strategy logs due for review.',
+      '  <h3 style="color: #be123c; margin-top: 0; font-family: sans-serif; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px;">⚠️ Minor Detail (Action Required)</h3>',
+      '  <p style="color: #4b5563; font-size: 13px; margin: 5px 0; line-height: 1.5;">',
+      '    Look, we all love paperwork. Okay, maybe not. But you currently have <strong>' + mtssCount + '</strong> outstanding student MTSS Tier 1 strategy logs due. Let\'s get these documented so we can pretend we have our lives completely together.',
       '  </p>',
-      '  <a href="https://docs.google.com/forms/d/e/1FAIpQLSdf_staff_mtss_log_form_placeholder/viewform" target="_blank" style="background-color: #be123c; color: white; padding: 8px 15px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 11px; display: inline-block; margin-top: 8px; text-transform: uppercase;">Log Strategies Now</a>',
+      '  <a href="https://docs.google.com/forms/d/e/1FAIpQLSdf_staff_mtss_log_form_placeholder/viewform" target="_blank" style="background-color: #be123c; color: white; padding: 8px 15px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 11px; display: inline-block; margin-top: 8px; text-transform: uppercase; letter-spacing: 0.5px;">Log Strategies</a>',
       '</div>'
     ].join('\n');
   } else {
     mtssSection = [
       '<div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 15px; margin-top: 20px;">',
-      '  <h3 style="color: #15803d; margin-top: 0; font-family: sans-serif; font-size: 14px; text-transform: uppercase;">✅ MTSS Documentation status</h3>',
-      '  <p style="color: #4b5563; font-size: 12px; margin: 0;">',
-      '    All clear! You are fully caught up with your student caseload reviews for this week. Thank you!',
+      '  <h3 style="color: #15803d; margin-top: 0; font-family: sans-serif; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px;">✅ MTSS Review Status: Clear</h3>',
+      '  <p style="color: #4b5563; font-size: 13px; margin: 0; line-height: 1.5;">',
+      '    Look at you. Zero outstanding MTSS logs. Go buy yourself a coffee, or take an extra long deep breath. You earned it.',
       '  </p>',
       '</div>'
     ].join('\n');
   }
+
+  // Witty greeting sentences (Ryan Reynolds style)
+  var greetings = [
+    "Hey " + name + ". Look at that, you made it to Friday. And turns out, people actually noticed you doing great things this week.",
+    "Well " + name + ", another week down. The good news? You've got some fan mail.",
+    "Hey " + name + ". Grab a coffee and sit down. We compiled your weekly appreciation digest, and you actually did pretty great."
+  ];
+  var greetingText = greetings[Math.floor(Math.random() * greetings.length)];
 
   var html = [
     '<div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);">',
@@ -257,31 +280,31 @@ function compileStaffDigestHTML(name, praiseCount, mtssCount) {
     '  ',
     '  <!-- Body -->',
     '  <div style="padding: 24px; background-color: #fafbfc;">',
-    '    <p style="color: #1f2937; font-size: 14px; margin-top: 0;">',
-    '      Hello <strong>' + name + '</strong>,',
+    '    <p style="color: #1f2937; font-size: 14px; margin-top: 0; font-weight: bold;">',
+    '      ' + greetingText,
     '    </p>',
     '    <p style="color: #4b5563; font-size: 13px; line-height: 1.6;">',
-    '      Thank you for another outstanding week at Copley! Here is your weekly digest detailing the positive praise slips and caseload updates logged across our campus.',
+    '      Here is your weekly summary of the Virtual Shout-Outs (VSOs) and points logged. Students who sent or received a shout-out are eligible to spin the PBIS lobby prize wheel today (Friday) for some glorious rewards.',
     '    </p>',
     '    ',
     '    <!-- Stats Card Grid -->',
     '    <div style="display: flex; gap: 15px; margin-top: 20px;">',
     '      <div style="flex: 1; background-color: white; border: 1px solid #e5e7eb; border-radius: 12px; padding: 15px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">',
-    '        <span style="font-size: 24px; display: block; margin-bottom: 5px;">🏆</span>',
+    '        <span style="font-size: 24px; display: block; margin-bottom: 5px;">✉️</span>',
     '        <span style="font-size: 20px; font-weight: 900; color: #0c2346; display: block;">' + praiseCount + '</span>',
     '        <span style="font-size: 9px; text-transform: uppercase; color: #9ca3af; font-weight: bold; display: block; margin-top: 3px;">Shout-Outs Received</span>',
     '      </div>',
     '      <div style="flex: 1; background-color: white; border: 1px solid #e5e7eb; border-radius: 12px; padding: 15px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">',
-    '        <span style="font-size: 24px; display: block; margin-bottom: 5px;">🔥</span>',
-    '        <span style="font-size: 20px; font-weight: 900; color: #ffcc04; display: block;">+' + (praiseCount * 5) + '</span>',
-    '        <span style="font-size: 9px; text-transform: uppercase; color: #9ca3af; font-weight: bold; display: block; margin-top: 3px;">House Points Earned</span>',
+    '        <span style="font-size: 24px; display: block; margin-bottom: 5px;">⚡</span>',
+    '        <span style="font-size: 20px; font-weight: 900; color: #ffcc04; display: block;">+' + (praiseCount * 10) + '</span>',
+    '        <span style="font-size: 9px; text-transform: uppercase; color: #9ca3af; font-weight: bold; display: block; margin-top: 3px;">Dept Points Earned</span>',
     '      </div>',
     '    </div>',
     '    ',
     '    ' + mtssSection,
     '    ',
     '    <div style="margin-top: 25px; border-top: 1px solid #e5e7eb; padding-top: 20px; text-align: center;">',
-    '      <a href="https://github.com/DarthRyan-explore/PBIS-Portal" target="_blank" style="background-color: #0c2346; color: #ffcc04; padding: 10px 20px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 11px; text-transform: uppercase; display: inline-block; border: 1px solid #ffcc04/20;">View Public Scoreboard</a>',
+    '      <a href="https://github.com/DarthRyan-explore/PBIS-Portal" target="_blank" style="background-color: #0c2346; color: #ffcc04; padding: 10px 20px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 11px; text-transform: uppercase; display: inline-block; border: 1px solid #ffcc04/20; letter-spacing: 0.5px;">View Public Scoreboard</a>',
     '    </div>',
     '  </div>',
     '  ',
@@ -746,6 +769,79 @@ function normalizeGradeToHouse(gradeVal) {
   }
   
   return "Freshmen";
+}
+
+/**
+ * Loads staff members dynamically from the Staff_Directory tab in Google Sheets.
+ * Falls back to a default list if the sheet doesn't exist yet.
+ *
+ * Expected columns:
+ * - Column A: Staff Name
+ * - Column B: Email
+ * - Column C: Department
+ *
+ * @returns {Object} Grouped directory metadata mapping.
+ */
+function getStaffDirectory() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName("Staff_Directory");
+  var staff = {};
+  
+  if (!sheet) {
+    // Fallback list to keep the system active before they paste the directory
+    Logger.log("Staff_Directory sheet tab not found. Using default staff fallback list.");
+    var defaultStaff = ["Sarah Janiga", "Lee Malcolm", "Maggie Steffen", "Amy Gray", "Tim Oden"];
+    defaultStaff.forEach(function(s) {
+      staff[s] = { 
+        name: s, 
+        email: s.toLowerCase().replace(" ", ".") + "@" + CONFIG.DISTRICT_DOMAIN, 
+        dept: "General Staff" 
+      };
+    });
+    return staff;
+  }
+  
+  var data = sheet.getDataRange().getValues();
+  if (data.length <= 1) return staff;
+  
+  // Columns: [0] Staff Name, [1] Email, [2] Department
+  for (var i = 1; i < data.length; i++) {
+    var name = data[i][0] ? data[i][0].toString().trim() : "";
+    var email = data[i][1] ? data[i][1].toString().trim().toLowerCase() : "";
+    var dept = data[i][2] ? data[i][2].toString().trim() : "General Staff";
+    
+    if (name) {
+      staff[name] = {
+        name: name,
+        email: email,
+        dept: dept
+      };
+    }
+  }
+  
+  return staff;
+}
+
+/**
+ * Safety preview function. Sends a test copy of the dynamic, Ryan Reynolds-voiced
+ * weekly digest directly to your logged-in Google inbox. 
+ *
+ * Open this in Google Apps Script toolbar, select 'sendTestDigestToMe', and click 'Run'.
+ */
+function sendTestDigestToMe() {
+  var myEmail = Session.getActiveUser().getEmail();
+  Logger.log("Compiling mock digest for testing...");
+  
+  var htmlBody = compileStaffDigestHTML("Test Instructor", 3, 2);
+  
+  MailApp.sendEmail({
+    to: myEmail,
+    subject: "🎨 Preview: Weekly PBIS Digest (Staff Copy) 🏹",
+    htmlBody: htmlBody,
+    name: CONFIG.EMAIL_SENDER_NAME
+  });
+  
+  Logger.log("Test digest email successfully sent to " + myEmail);
 }
 
 
