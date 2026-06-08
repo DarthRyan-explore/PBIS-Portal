@@ -686,9 +686,8 @@
 
       <!-- Quick Session Controls & Active Teacher Profile -->
       <div class="flex items-center gap-4 flex-wrap md:flex-nowrap">
-        
-        <!-- Portal Mode Switcher Toggle -->
-        <div class="flex items-center bg-slate-900/40 border border-slate-700/50 p-1 rounded-xl shadow-inner select-none font-bold text-[10px]">
+            <!-- Portal Mode Switcher Toggle (Hidden for Public Signage, shown on Admin auth) -->
+        <div id="headerPortalSwitcher" class="hidden items-center bg-slate-900/40 border border-slate-700/50 p-1 rounded-xl shadow-inner select-none font-bold text-[10px]">
           <span class="text-[9px] text-slate-400 mr-2 uppercase tracking-wider pl-1.5">Portal Mode:</span>
           <button onclick="togglePortalMode('staff')" id="portal-toggle-staff" class="bg-copley-gold text-copley-blue px-3 py-1.5 rounded-lg font-black uppercase transition-all shadow-sm flex items-center gap-1">
             <i class="fa-solid fa-graduation-cap"></i>
@@ -700,9 +699,7 @@
           </button>
         </div>
 
-
-
-        <!-- Student Selector (Visible in Student Mode) -->
+        <!-- Student Selector (Visible in Student Mode on Admin login) -->
         <div id="headerStudentSelectorContainer" class="hidden items-center bg-slate-900/30 border border-slate-700/50 px-4 py-1.5 rounded-xl">
           <div class="text-right select-none">
             <div class="text-[9px] text-slate-300 font-semibold uppercase leading-none">Active Student:</div>
@@ -716,8 +713,8 @@
           </div>
         </div>
 
-        <!-- Staff Selector (Visible in Staff Mode) -->
-        <div id="headerStaffSelectorContainer" class="flex items-center bg-slate-900/30 border border-slate-700/50 px-4 py-1.5 rounded-xl">
+        <!-- Staff Selector (Visible in Staff Mode on Admin login) -->
+        <div id="headerStaffSelectorContainer" class="hidden items-center bg-slate-900/30 border border-slate-700/50 px-4 py-1.5 rounded-xl">
           <div class="text-right">
             <div class="text-[10px] text-slate-300 font-semibold uppercase tracking-wider">Active Staff Profile:</div>
             <div id="sessionStaffName" class="text-sm font-black text-copley-gold heading-style">Sarah Janiga</div>
@@ -1905,233 +1902,107 @@
     <!-- ======================================================================= -->
         <div id="student-portal-workspace" class="lg:col-span-12 grid grid-cols-1 lg:grid-cols-12 gap-6 flex-grow hidden">
       
-      <!-- Left Column: Student Sidebar Navigation (lg:col-span-3) -->
-      <aside class="lg:col-span-3 flex flex-col gap-4 select-none">
+      <!-- Full Width Scoreboard Display Area (lg:col-span-12) -->
+      <div id="studentTabContentArea" class="lg:col-span-12 flex flex-col gap-6">
         
-        <!-- Student Identity Deck -->
-        <div id="studentIdentityCard" class="bg-white border border-slate-200/80 p-5 rounded-2xl shadow-glass text-center relative overflow-hidden shrink-0 transition-all duration-300">
-          <!-- Procedural Backdrop Layers -->
-          <div id="studentCardMonogramBg" class="monogram-backdrop-text hidden">F</div>
-          <div id="studentCardEmojiBg" class="emoji-backdrop-grid hidden"></div>
-          <div id="studentCardLofiBg" class="lofi-grid-backdrop hidden"></div>
-          
-          <div class="absolute -right-24 -top-24 w-48 h-48 bg-copley-gold/10 rounded-full blur-3xl pointer-events-none"></div>
-          
-          <div class="relative w-24 h-24 mx-auto mb-1 flex items-center justify-center">
-            <!-- Glow wrapper -->
-            <div id="studentDashboardAvatarGlowWrapper" class="relative transition-all duration-300">
-              <!-- Outer boundary (White border) -->
-              <div id="studentDashboardAvatarOuter" class="w-20 h-20 bg-white p-[2px] transition-all duration-300">
-                <!-- Inner container (Gradient bg) -->
-                <div id="studentDashboardAvatarInner" class="w-full h-full flex items-center justify-center relative select-none transition-all duration-300">
-                  <span id="studentDashboardLetter" class="z-10 select-none">F</span>
-                </div>
-              </div>
-            </div>
+        <!-- Horizontal Signage Navigation Bar (Visible on Screen) -->
+        <nav class="bg-white border border-slate-200/80 p-2.5 rounded-2xl shadow-glass flex flex-row justify-between items-center select-none gap-2 shrink-0">
+          <div class="flex items-center gap-1.5">
+            <button id="snav-clash" onclick="switchStudentTab('clash')" class="flex items-center space-x-2 px-4 py-2.5 rounded-xl font-black transition-all duration-200 text-xs shadow-md bg-copley-blue text-copley-gold border border-copley-gold/20 select-none">
+              <i class="fa-solid fa-trophy text-sm"></i>
+              <span>🏆 Copley House Cup</span>
+            </button>
+            <button id="snav-raffle" onclick="switchStudentTab('raffle')" class="flex items-center space-x-2 px-4 py-2.5 rounded-xl font-bold transition-all duration-200 text-xs text-slate-650 hover:bg-slate-100 hover:text-copley-blue select-none">
+              <i class="fa-solid fa-ticket text-sm"></i>
+              <span>🎟️ Rewards Showcase</span>
+            </button>
+            <button id="snav-leaderboard" onclick="switchStudentTab('leaderboard')" class="flex items-center space-x-2 px-4 py-2.5 rounded-xl font-bold transition-all duration-200 text-xs text-slate-650 hover:bg-slate-100 hover:text-copley-blue select-none">
+              <i class="fa-solid fa-ranking-star text-sm"></i>
+              <span>🏆 Top Scholars</span>
+            </button>
+            <button id="snav-shoutout" onclick="switchStudentTab('shoutout')" class="flex items-center space-x-2 px-4 py-2.5 rounded-xl font-bold transition-all duration-200 text-xs text-slate-650 hover:bg-slate-100 hover:text-copley-blue select-none">
+              <i class="fa-solid fa-bullhorn text-sm"></i>
+              <span>📣 Chromebook Forms</span>
+            </button>
           </div>
           
-          <h3 id="studentDashboardName" class="text-base font-black text-copley-blue heading-style mt-2 leading-none">Frodo Baggins</h3>
-          
-          <!-- Dynamic Custom Title Badge -->
-          <div id="studentDashboardTitleBadge" class="mt-2 inline-block text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded bg-copley-gold/10 text-copley-blue border border-copley-gold/25 select-none heading-style shadow-sm">Copley Scholar</div>
-          
-          <p id="studentDashboardEmail" class="text-[10px] text-slate-400 mt-1.5 font-bold">frodo.baggins@copley-fairlawn.org</p>
-          
-          <!-- Cosmetics Shop Trigger Button -->
-          <button onclick="openCosmeticsModal()" class="mt-3.5 w-full bg-slate-50 border border-slate-200 hover:border-copley-blue hover:text-copley-blue font-black text-[9px] py-2 rounded-xl transition uppercase flex items-center justify-center gap-1.5 shadow-sm active:scale-98">
-            <i class="fa-solid fa-palette text-xs text-copley-blueLight"></i>
-            <span>Customize Name Badge</span>
-          </button>
-          
-          <div class="h-px bg-slate-100 my-4"></div>
-          
-          <!-- Levelling Stats Progress -->
-          <div class="space-y-2 text-left">
-            <div class="flex justify-between text-[10px] font-black text-slate-400 uppercase tracking-wider">
-              <span>PBIS Engagement Level</span>
-              <span id="studentLevelLabel" class="text-copley-blue">Level 3 (Scholar)</span>
-            </div>
-            <!-- Progress Bar -->
-            <div class="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden border border-slate-200/50">
-              <div id="studentLevelProgressBar" class="bg-gradient-to-r from-copley-blue to-copley-gold h-full rounded-full transition-all duration-500" style="width: 65%;"></div>
-            </div>
-            <div class="flex justify-between text-[9px] text-slate-400 font-bold">
-              <span id="studentLifetimePoints">42 Lifetime Points</span>
-              <span>18 pts to next level</span>
-            </div>
-          </div>
-
-        </div>
-
-        <!-- Vertical Navigation Stack -->
-        <nav class="flex flex-col gap-2 bg-white border border-slate-200/80 p-3 rounded-2xl shadow-glass shrink-0">
-          <button id="snav-shoutout" onclick="switchStudentTab('shoutout')" class="flex items-center space-x-3 px-4 py-3 rounded-xl font-bold transition-all duration-200 text-xs text-slate-650 hover:bg-slate-100 hover:text-copley-blue border-l-4 border-transparent text-left w-full">
-            <i class="fa-solid fa-bullhorn text-sm"></i>
-            <span>📣 Send a Shout-Out</span>
-          </button>
-          
-          <button id="snav-raffle" onclick="switchStudentTab('raffle')" class="flex items-center space-x-3 px-4 py-3 rounded-xl font-bold transition-all duration-200 text-xs text-slate-650 hover:bg-slate-100 hover:text-copley-blue border-l-4 border-transparent text-left w-full">
-            <i class="fa-solid fa-ticket text-sm"></i>
-            <span>🎟️ Raffle Prizes & Store</span>
-          </button>
-          
-          <button id="snav-clash" onclick="switchStudentTab('clash')" class="flex items-center space-x-3 px-4 py-3 rounded-xl font-bold transition-all duration-200 text-xs text-slate-650 hover:bg-slate-100 hover:text-copley-blue border-l-4 border-transparent text-left w-full">
-            <i class="fa-solid fa-trophy text-sm"></i>
-            <span>🏆 Copley House Cup</span>
-          </button>
-          
-          <button id="snav-leaderboard" onclick="switchStudentTab('leaderboard')" class="flex items-center space-x-3 px-4 py-3 rounded-xl font-bold transition-all duration-200 text-xs text-slate-650 hover:bg-slate-100 hover:text-copley-blue border-l-4 border-transparent text-left w-full">
-            <i class="fa-solid fa-ranking-star text-sm"></i>
-            <span>🏆 Top Scholars Leaderboard</span>
+          <!-- TV Auto-Cycle Loop Controls -->
+          <button id="tvLoopBtn" onclick="toggleTvLoop()" class="bg-slate-50 border border-slate-200 hover:border-copley-blue hover:text-copley-blue font-black text-[10px] px-4 py-2.5 rounded-xl transition uppercase flex items-center gap-1.5 shadow-sm active:scale-95 select-none">
+            <i class="fa-solid fa-play text-xs text-emerald-600" id="tvLoopIcon"></i>
+            <span id="tvLoopText">Play TV Slide Loop</span>
           </button>
         </nav>
 
-        <!-- Standalone Standings Widget -->
-        <div class="bg-white border border-slate-200/80 p-3 rounded-2xl shadow-glass flex items-center gap-3 select-none shrink-0">
-          <div class="w-10 h-10 rounded bg-copley-blue text-copley-gold flex items-center justify-center font-black text-sm" id="studentClassClashIcon">🥇</div>
-          <div class="text-xs leading-tight text-left">
-            <span class="text-slate-400 font-bold uppercase tracking-wider block text-[8px]">Class Spirit Standing</span>
-            <span class="text-slate-700 font-bold block" id="studentClassClashText">Loading...</span>
-          </div>
-        </div>
-
-      </aside>
-
-      <!-- Right Content Desk: Student Content Desk (lg:col-span-9) -->
-      <div id="studentTabContentArea" class="lg:col-span-9 flex flex-col gap-6">
-        
-        <!-- Tab 1: Send a Shout-Out (📣 Virtual Shout-out Builder & Words of Appreciation) -->
-        <div id="studentTab-shoutout" class="student-tab-content hidden grid grid-cols-1 xl:grid-cols-12 gap-6">
-          
-          <!-- Column 1: Send Shout-Out Form (xl:col-span-7) -->
-          <div class="xl:col-span-7 bg-white border border-slate-200/80 p-5 rounded-2xl shadow-glass flex flex-col justify-between">
-            <div>
-              <h3 class="text-sm font-black text-copley-blue mb-3.5 flex items-center gap-2 heading-style border-b border-slate-100 pb-2.5">
-                <i class="fa-solid fa-bullhorn text-copley-gold animate-pulse"></i>
-                <span>Center for Virtual Shout-Out</span>
-              </h3>
-              <p class="text-[11px] text-slate-400 mb-4 font-semibold leading-relaxed">
-                Send a positive virtual shout-out to any teacher or staff member in the building! Let's celebrate our teachers and show appreciation.
-              </p>
-
-              <!-- Student Slip Form -->
-              <form id="studentSlipForm" onsubmit="event.preventDefault(); submitStudentSlip();" class="space-y-4">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label class="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Select Target Staff / Teacher</label>
-                    <select id="slipTeacherTarget" class="w-full bg-slate-50 border border-slate-200 p-3 rounded-xl text-slate-800 font-semibold focus:outline-none focus:border-copley-blue text-xs">
-                      <!-- Dynamically populated with active staff -->
-                    </select>
-                  </div>
-                  <div>
-                    <label class="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Virtual Shout-Out Category</label>
-                    <select id="slipCategory" class="w-full bg-slate-50 border border-slate-200 p-3 rounded-xl text-slate-800 font-semibold focus:outline-none focus:border-copley-blue text-xs">
-                      <option value="GOAT VSO">GOAT VSO ("You were simply the GOAT.")</option>
-                      <option value="Barrier Breaker VSO">Barrier Breaker VSO ("You understood my barriers and helped me overcome them.")</option>
-                      <option value="Captivating VSO">Captivating VSO ("You made even the most boring topics interesting.")</option>
-                      <option value="Time-Turner VSO">Time-Turner VSO ("You gave me more time to complete my work.")</option>
-                      <option value="'You Heard Me' VSO">'You Heard Me' VSO ("You listened to me and helped me solve problems.")</option>
-                      <option value="Super Support VSO">Super Support VSO ("You provided one-on-one help when I needed it.")</option>
-                      <option value="Welcome Wagon VSO">Welcome Wagon VSO ("You made me feel welcome at school.")</option>
-                    </select>
-                  </div>
-                </div>
-                <div>
-                  <label class="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Appreciation Message Description</label>
-                  <textarea id="slipNotes" required rows="3" class="w-full bg-slate-50 border border-slate-200 p-3.5 rounded-xl text-slate-800 font-medium focus:outline-none focus:border-copley-blue text-xs leading-relaxed" placeholder="Write a short message about why this teacher's instruction, care, or support made a difference to you today..."></textarea>
-                </div>
-                <div class="flex items-center gap-2 select-none">
-                  <input type="checkbox" id="slipAnonymous" class="w-4 h-4 rounded border-slate-300 text-copley-blue focus:ring-copley-gold focus:ring-2 focus:ring-offset-2 cursor-pointer">
-                  <label for="slipAnonymous" class="text-xs text-slate-600 font-semibold cursor-pointer">Send virtual shout-out anonymously (hide my student name from staff)</label>
-                </div>
-                <button type="submit" class="w-full bg-copley-blue hover:opacity-95 text-copley-gold font-black p-3.5 rounded-xl transition shadow-md flex items-center justify-center gap-2 transform active:scale-99 border-2 border-white hover:border-copley-gold">
-                  <i class="fa-solid fa-paper-plane text-xs"></i>
-                  <span class="heading-style uppercase tracking-widest text-xs">Send Virtual Shout-Out to Staff</span>
-                </button>
-              </form>
-            </div>
-          </div>
-
-          <!-- Column 2: Words of Appreciation (xl:col-span-5) -->
-          <div class="xl:col-span-5 bg-white border border-slate-200/80 p-5 rounded-2xl shadow-glass flex flex-col justify-between">
-            <div>
-              <h3 class="text-sm font-black text-copley-blue mb-3.5 flex items-center gap-2 heading-style border-b border-slate-100 pb-2.5">
-                <i class="fa-solid fa-heart text-rose-500 animate-pulse"></i>
-                <span>Appreciation from Staff</span>
-              </h3>
-              <p class="text-[11px] text-slate-400 mb-4 font-semibold leading-relaxed">
-                Kind, affirming shout-outs sent to you by your teachers and staff. Celebrate your hard work!
-              </p>
+        <!-- Tab 1: Chromebook Forms Instructions -->
+        <div id="studentTab-shoutout" class="student-tab-content hidden grid grid-cols-1 lg:grid-cols-12 gap-6">
+          <div class="lg:col-span-12 bg-white border border-slate-200/80 p-6 rounded-2xl shadow-glass text-center select-none relative overflow-hidden">
+            <div class="absolute -left-24 -bottom-24 w-64 h-64 bg-copley-blue/5 rounded-full blur-3xl pointer-events-none"></div>
+            
+            <div class="max-w-2xl mx-auto py-8 space-y-6">
+              <div class="w-16 h-16 bg-copley-gold/10 border border-copley-gold/30 rounded-full flex items-center justify-center mx-auto text-copley-blue shadow-inner text-2xl">
+                <i class="fa-solid fa-laptop-code text-copley-blue animate-pulse"></i>
+              </div>
               
-              <div id="studentReceivedVSODeck" class="space-y-4 overflow-y-auto max-h-[420px] pr-1 custom-scrollbar">
-                <!-- Dynamically populated via Javascript -->
+              <div class="space-y-2">
+                <h3 class="text-lg font-black text-copley-blue uppercase tracking-tight heading-style">District Chromebook Portals</h3>
+                <p class="text-xs text-slate-400 font-semibold leading-relaxed">
+                  Under state guidelines, student phone usage is prohibited inside our school building. 
+                  To log PBIS interactions, access your district-issued Chromebook browser shortcuts:
+                </p>
+              </div>
+              
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4">
+                <a href="https://docs.google.com/forms/d/e/1FAIpQLSdf_student_shoutout_form_placeholder/viewform" target="_blank" class="bg-slate-50 hover:bg-slate-100/50 border border-slate-200 p-5 rounded-2xl transition shadow-sm text-left flex flex-col justify-between group hover:border-copley-blue">
+                  <div>
+                    <span class="text-[8px] font-black text-copley-gold uppercase tracking-widest block leading-none">Student Access</span>
+                    <h4 class="text-xs font-extrabold text-slate-800 mt-2 flex items-center gap-1.5 heading-style">
+                      <i class="fa-solid fa-bullhorn text-copley-blue group-hover:animate-bounce"></i>
+                      <span>Send a Shout-Out to Staff</span>
+                    </h4>
+                    <p class="text-[10px] text-slate-400 font-medium leading-normal mt-1.5">
+                      Praise a teacher, counselor, or school staff member for their support, encouragement, or captivating lessons.
+                    </p>
+                  </div>
+                  <span class="text-[9px] font-black text-copley-blue uppercase tracking-wider block mt-4 group-hover:translate-x-1 transition-transform">Open Form &rarr;</span>
+                </a>
+                
+                <a href="https://docs.google.com/forms/d/e/1FAIpQLSdf_staff_mtss_log_form_placeholder/viewform" target="_blank" class="bg-slate-50 hover:bg-slate-100/50 border border-slate-200 p-5 rounded-2xl transition shadow-sm text-left flex flex-col justify-between group hover:border-copley-blue">
+                  <div>
+                    <span class="text-[8px] font-black text-emerald-600 uppercase tracking-widest block leading-none">Staff Access</span>
+                    <h4 class="text-xs font-extrabold text-slate-800 mt-2 flex items-center gap-1.5 heading-style">
+                      <i class="fa-solid fa-graduation-cap text-copley-blue group-hover:animate-bounce"></i>
+                      <span>Log Student Praise / MTSS</span>
+                    </h4>
+                    <p class="text-[10px] text-slate-400 font-medium leading-normal mt-1.5">
+                      Log Tier 1 classroom strategies, positive praise slips, and weekly Check & Connect mentor logs.
+                    </p>
+                  </div>
+                  <span class="text-[9px] font-black text-copley-blue uppercase tracking-wider block mt-4 group-hover:translate-x-1 transition-transform">Open Form &rarr;</span>
+                </a>
               </div>
             </div>
           </div>
-
         </div>
 
         <!-- Tab 2: Raffle Hall & Store (🎟️ Points-to-Tickets & Baskets) -->
         <div id="studentTab-raffle" class="student-tab-content hidden space-y-6">
           
           <!-- Direct Purchase Raffle Tickets Panel -->
-          <div class="bg-white border border-slate-200/80 p-5 rounded-2xl shadow-glass flex flex-col items-stretch relative overflow-hidden">
-            <div class="absolute -left-24 -bottom-24 w-48 h-48 bg-copley-blue/5 rounded-full blur-3xl pointer-events-none"></div>
-
-            <h3 class="text-sm font-black text-copley-blue heading-style flex items-center gap-1.5 border-b border-slate-100 pb-2.5 w-full shrink-0">
-              <i class="fa-solid fa-ticket text-copley-gold animate-bounce"></i>
-              <span>Raffle Ticket Hub</span>
-            </h3>
-            
-            <p class="text-[11px] text-slate-400 font-semibold mt-2.5 leading-normal">
-              Convert your earned PBIS points directly into Raffle Tickets! Each ticket costs exactly <span class="text-copley-blue font-black">5 points</span>.
-            </p>
-
-            <!-- Ticket Economy Counter -->
-            <div class="grid grid-cols-2 gap-3 w-full my-4 shrink-0 font-bold text-center text-xs">
-              <div class="bg-slate-50 border border-slate-200/80 p-2.5 rounded-xl shadow-inner">
-                <span class="text-[8px] text-slate-400 block uppercase tracking-wider">Available Points</span>
-                <span id="studentPointsAvailable" class="text-xl font-black text-copley-blue leading-none mt-1.5 block">0</span>
+          <div class="bg-gradient-to-r from-copley-blue to-indigo-950 p-6 rounded-2xl border border-copley-gold/30 text-white relative overflow-hidden select-none shadow-md">
+            <div class="absolute -right-16 -top-16 w-36 h-36 bg-copley-gold/15 rounded-full blur-2xl pointer-events-none"></div>
+            <div class="relative z-10 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div>
+                <span class="text-[9px] font-black text-copley-gold uppercase tracking-widest block leading-none mb-1">Copley PBIS Redemptions</span>
+                <h4 class="text-base font-black heading-style leading-tight text-white">Physical Rewards & Spinning Prize Wheel</h4>
+                <p class="text-[10px] text-slate-350 mt-2 leading-relaxed font-medium max-w-xl">
+                  This scoreboard is public and does not store login passwords or personal accounts. 
+                  To spend your points, check your school inbox for your <strong>Weekly PBIS Email Digest</strong> showing your official point totals, and present it at the physical school PBIS table on Friday to claim your spin on the prize wheel or enter local raffle baskets!
+                </p>
               </div>
-              <div class="bg-slate-50 border border-slate-200/80 p-2.5 rounded-xl shadow-inner">
-                <span class="text-[8px] text-slate-400 block uppercase tracking-wider">Unallocated Tickets</span>
-                <span id="studentRaffleTicketsCount" class="text-xl font-black text-emerald-600 leading-none mt-1.5 block">0</span>
+              <div class="bg-copley-gold/10 border border-copley-gold/30 p-3.5 rounded-xl text-center shrink-0 w-full sm:w-auto">
+                <span class="text-[8px] text-copley-gold block font-black uppercase tracking-wider">Ticket Cost</span>
+                <span class="text-sm font-black text-white block mt-0.5 heading-style">5 Points / Entry</span>
               </div>
-            </div>
-
-            <!-- Purchase Controls -->
-            <div class="space-y-3">
-              <div class="flex items-center justify-between gap-2 bg-slate-50 border border-slate-200/60 p-2.5 rounded-xl">
-                <div class="text-left">
-                  <span class="text-[8px] text-slate-400 block font-bold uppercase tracking-wider">Purchase Qty</span>
-                  <span class="text-xs font-black text-slate-700">1 Ticket</span>
-                </div>
-                <button id="btnBuyTicket1" onclick="buyRaffleTickets(1)" class="bg-copley-blue hover:bg-copley-blue/95 text-copley-gold border-2 border-white hover:border-copley-gold font-black text-[10px] px-3.5 py-2 rounded-lg transition uppercase shadow-sm active:scale-95 flex items-center gap-1">
-                  <i class="fa-solid fa-plus-circle"></i>
-                  <span>Buy (-5 Pts)</span>
-                </button>
-              </div>
-              
-              <div class="flex items-center justify-between gap-2 bg-slate-50 border border-slate-200/60 p-2.5 rounded-xl">
-                <div class="text-left">
-                  <span class="text-[8px] text-slate-400 block font-bold uppercase tracking-wider">Bulk Bundle</span>
-                  <span class="text-xs font-black text-slate-700">5 Tickets</span>
-                </div>
-                <button id="btnBuyTicket5" onclick="buyRaffleTickets(5)" class="bg-emerald-600 hover:bg-emerald-700 text-white border-2 border-white hover:border-emerald-500 font-black text-[10px] px-3.5 py-2 rounded-lg transition uppercase shadow-sm active:scale-95 flex items-center gap-1">
-                  <i class="fa-solid fa-ticket"></i>
-                  <span>Buy (-25 Pts)</span>
-                </button>
-              </div>
-            </div>
-
-            <!-- Interactive Alerts Ledger inside Purchase Hub -->
-            <div class="w-full mt-4 bg-slate-50 border border-slate-200 p-3 rounded-xl text-[10px] font-bold text-slate-500 space-y-1">
-              <div class="flex items-center gap-1.5 text-copley-blue">
-                <i class="fa-solid fa-circle-info"></i>
-                <span>Copley PBIS Economy Guide:</span>
-              </div>
-              <div>• Tickets are strictly non-refundable once purchased.</div>
-              <div>• Drop tickets in vendor raffle baskets on the right to enter!</div>
             </div>
           </div>
 
@@ -2143,14 +2014,9 @@
               <div>
                 <h3 class="text-sm font-black text-copley-blue heading-style flex items-center gap-2">
                   <i class="fa-solid fa-gift text-emerald-600 animate-bounce"></i>
-                  <span>Donated Vendor Raffle Baskets Hall</span>
+                  <span>Physical Raffle Baskets Catalog</span>
                 </h3>
-                <p class="text-[11px] text-slate-400 font-semibold mt-1">Invest your earned Raffle Tickets to win premium prizes donated by local partners!</p>
-              </div>
-              
-              <div class="bg-emerald-50 border border-emerald-100 text-emerald-800 text-[10px] font-black px-3.5 py-1.5 rounded-lg flex items-center gap-1.5 shadow-sm">
-                <i class="fa-solid fa-ticket animate-pulse"></i>
-                <span>My Unallocated Tickets: <span id="studentRaffleTicketsLabel" class="text-xs font-black">0</span></span>
+                <p class="text-[11px] text-slate-400 font-semibold mt-1">Browse active prizes up for grabs at the Friday PBIS spin wheel in the main lobby!</p>
               </div>
             </div>
 
@@ -2172,13 +2038,13 @@
                 </div>
                 <div class="mt-4 pt-3.5 border-t border-slate-200/60 flex items-center justify-between gap-2">
                   <div class="text-left font-bold">
-                    <span class="text-[7.5px] text-slate-400 uppercase block tracking-wider leading-none">Entries</span>
-                    <span id="raffle-cfa-count" class="text-xs text-copley-blue">0 Tickets</span>
+                    <span class="text-[7.5px] text-slate-400 uppercase block tracking-wider leading-none">Raffle Entries</span>
+                    <span id="raffle-cfa-count" class="text-xs text-copley-blue">Active Basket</span>
                   </div>
-                  <button onclick="enterRaffleTicket('cfa')" class="bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[9px] px-3 py-1.5 rounded-lg transition uppercase flex items-center gap-1 shadow-sm active:scale-95 border border-emerald-500">
-                    <i class="fa-solid fa-plus-circle"></i>
-                    <span>Enter</span>
-                  </button>
+                  <div class="bg-slate-100 text-slate-500 font-black text-[8px] px-2.5 py-1.5 rounded-lg border border-slate-200 select-none uppercase tracking-wider flex items-center gap-1">
+                    <i class="fa-solid fa-store text-[8.5px]"></i>
+                    <span>Redeem at Table</span>
+                  </div>
                 </div>
               </div>
 
@@ -2197,13 +2063,13 @@
                 </div>
                 <div class="mt-4 pt-3.5 border-t border-slate-200/60 flex items-center justify-between gap-2">
                   <div class="text-left font-bold">
-                    <span class="text-[7.5px] text-slate-400 uppercase block tracking-wider leading-none">Entries</span>
-                    <span id="raffle-gamestop-count" class="text-xs text-copley-blue">0 Tickets</span>
+                    <span class="text-[7.5px] text-slate-400 uppercase block tracking-wider leading-none">Raffle Entries</span>
+                    <span id="raffle-gamestop-count" class="text-xs text-copley-blue">Active Basket</span>
                   </div>
-                  <button onclick="enterRaffleTicket('gamestop')" class="bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[9px] px-3 py-1.5 rounded-lg transition uppercase flex items-center gap-1 shadow-sm active:scale-95 border border-emerald-500">
-                    <i class="fa-solid fa-plus-circle"></i>
-                    <span>Enter</span>
-                  </button>
+                  <div class="bg-slate-100 text-slate-500 font-black text-[8px] px-2.5 py-1.5 rounded-lg border border-slate-200 select-none uppercase tracking-wider flex items-center gap-1">
+                    <i class="fa-solid fa-store text-[8.5px]"></i>
+                    <span>Redeem at Table</span>
+                  </div>
                 </div>
               </div>
 
@@ -2222,13 +2088,13 @@
                 </div>
                 <div class="mt-4 pt-3.5 border-t border-slate-200/60 flex items-center justify-between gap-2">
                   <div class="text-left font-bold">
-                    <span class="text-[7.5px] text-slate-400 uppercase block tracking-wider leading-none">Entries</span>
-                    <span id="raffle-starbucks-count" class="text-xs text-copley-blue">0 Tickets</span>
+                    <span class="text-[7.5px] text-slate-400 uppercase block tracking-wider leading-none">Raffle Entries</span>
+                    <span id="raffle-starbucks-count" class="text-xs text-copley-blue">Active Basket</span>
                   </div>
-                  <button onclick="enterRaffleTicket('starbucks')" class="bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[9px] px-3 py-1.5 rounded-lg transition uppercase flex items-center gap-1 shadow-sm active:scale-95 border border-emerald-500">
-                    <i class="fa-solid fa-plus-circle"></i>
-                    <span>Enter</span>
-                  </button>
+                  <div class="bg-slate-100 text-slate-500 font-black text-[8px] px-2.5 py-1.5 rounded-lg border border-slate-200 select-none uppercase tracking-wider flex items-center gap-1">
+                    <i class="fa-solid fa-store text-[8.5px]"></i>
+                    <span>Redeem at Table</span>
+                  </div>
                 </div>
               </div>
 
@@ -2247,13 +2113,13 @@
                 </div>
                 <div class="mt-4 pt-3.5 border-t border-slate-200/60 flex items-center justify-between gap-2">
                   <div class="text-left font-bold">
-                    <span class="text-[7.5px] text-slate-400 uppercase block tracking-wider leading-none">Entries</span>
-                    <span id="raffle-canes-count" class="text-xs text-copley-blue">0 Tickets</span>
+                    <span class="text-[7.5px] text-slate-400 uppercase block tracking-wider leading-none">Raffle Entries</span>
+                    <span id="raffle-canes-count" class="text-xs text-copley-blue">Active Basket</span>
                   </div>
-                  <button onclick="enterRaffleTicket('canes')" class="bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[9px] px-3 py-1.5 rounded-lg transition uppercase flex items-center gap-1 shadow-sm active:scale-95 border border-emerald-500">
-                    <i class="fa-solid fa-plus-circle"></i>
-                    <span>Enter</span>
-                  </button>
+                  <div class="bg-slate-100 text-slate-500 font-black text-[8px] px-2.5 py-1.5 rounded-lg border border-slate-200 select-none uppercase tracking-wider flex items-center gap-1">
+                    <i class="fa-solid fa-store text-[8.5px]"></i>
+                    <span>Redeem at Table</span>
+                  </div>
                 </div>
               </div>
 
@@ -2272,13 +2138,13 @@
                 </div>
                 <div class="mt-4 pt-3.5 border-t border-slate-200/60 flex items-center justify-between gap-2">
                   <div class="text-left font-bold">
-                    <span class="text-[7.5px] text-slate-400 uppercase block tracking-wider leading-none">Entries</span>
-                    <span id="raffle-citybbq-count" class="text-xs text-copley-blue">0 Tickets</span>
+                    <span class="text-[7.5px] text-slate-400 uppercase block tracking-wider leading-none">Raffle Entries</span>
+                    <span id="raffle-citybbq-count" class="text-xs text-copley-blue">Active Basket</span>
                   </div>
-                  <button onclick="enterRaffleTicket('citybbq')" class="bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[9px] px-3 py-1.5 rounded-lg transition uppercase flex items-center gap-1 shadow-sm active:scale-95 border border-emerald-500">
-                    <i class="fa-solid fa-plus-circle"></i>
-                    <span>Enter</span>
-                  </button>
+                  <div class="bg-slate-100 text-slate-500 font-black text-[8px] px-2.5 py-1.5 rounded-lg border border-slate-200 select-none uppercase tracking-wider flex items-center gap-1">
+                    <i class="fa-solid fa-store text-[8.5px]"></i>
+                    <span>Redeem at Table</span>
+                  </div>
                 </div>
               </div>
 
@@ -2297,13 +2163,13 @@
                 </div>
                 <div class="mt-4 pt-3.5 border-t border-slate-200/60 flex items-center justify-between gap-2">
                   <div class="text-left font-bold">
-                    <span class="text-[7.5px] text-slate-400 uppercase block tracking-wider leading-none">Entries</span>
-                    <span id="raffle-bestbuy-count" class="text-xs text-copley-blue">0 Tickets</span>
+                    <span class="text-[7.5px] text-slate-400 uppercase block tracking-wider leading-none">Raffle Entries</span>
+                    <span id="raffle-bestbuy-count" class="text-xs text-copley-blue">Active Basket</span>
                   </div>
-                  <button onclick="enterRaffleTicket('bestbuy')" class="bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[9px] px-3 py-1.5 rounded-lg transition uppercase flex items-center gap-1 shadow-sm active:scale-95 border border-emerald-500">
-                    <i class="fa-solid fa-plus-circle"></i>
-                    <span>Enter</span>
-                  </button>
+                  <div class="bg-slate-100 text-slate-500 font-black text-[8px] px-2.5 py-1.5 rounded-lg border border-slate-200 select-none uppercase tracking-wider flex items-center gap-1">
+                    <i class="fa-solid fa-store text-[8.5px]"></i>
+                    <span>Redeem at Table</span>
+                  </div>
                 </div>
               </div>
 
@@ -2322,13 +2188,13 @@
                 </div>
                 <div class="mt-4 pt-3.5 border-t border-slate-200/60 flex items-center justify-between gap-2">
                   <div class="text-left font-bold">
-                    <span class="text-[7.5px] text-slate-400 uppercase block tracking-wider leading-none">Entries</span>
-                    <span id="raffle-spiritshop-count" class="text-xs text-copley-blue">0 Tickets</span>
+                    <span class="text-[7.5px] text-slate-400 uppercase block tracking-wider leading-none">Raffle Entries</span>
+                    <span id="raffle-spiritshop-count" class="text-xs text-copley-blue">Active Basket</span>
                   </div>
-                  <button onclick="enterRaffleTicket('spiritshop')" class="bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[9px] px-3 py-1.5 rounded-lg transition uppercase flex items-center gap-1 shadow-sm active:scale-95 border border-emerald-500">
-                    <i class="fa-solid fa-plus-circle"></i>
-                    <span>Enter</span>
-                  </button>
+                  <div class="bg-slate-100 text-slate-500 font-black text-[8px] px-2.5 py-1.5 rounded-lg border border-slate-200 select-none uppercase tracking-wider flex items-center gap-1">
+                    <i class="fa-solid fa-store text-[8.5px]"></i>
+                    <span>Redeem at Table</span>
+                  </div>
                 </div>
               </div>
 
@@ -4925,8 +4791,8 @@
       const student = AppState.activeStudent;
       const std = AppState.students.find(s => s.name === student) || { email: "", points: 0, tier: "Tier 1" };
       
-      document.getElementById('studentDashboardName').innerText = student;
-      document.getElementById('studentDashboardEmail').innerText = std.email;
+      document.getElementById('studentDashboardName').innerText = anonymizeStudentName(student);
+      document.getElementById('studentDashboardEmail').innerText = "student." + anonymizeStudentName(student).replace("Student #", "") + "@copley-fairlawn.org";
       
       // --- Student Cosmetics Integration ---
       initStudentCosmetics();
@@ -6388,8 +6254,7 @@
       card.classList.add('scale-100');
       
       // Load current student stats
-      const student = AppState.activeStudent;
-      document.getElementById('previewStudentName').innerText = student;
+      document.getElementById('previewStudentName').innerText = anonymizeStudentName(student);
       
       // Initialize temporary preview state with equipped cosmetics
       const cos = AppState.studentCosmetics[student] || {
@@ -8809,6 +8674,17 @@
       updateSelectedStudentLabels();
       renderStudentLeaderboard();
       renderEquityChecklist();
+      // Set default portal mode to Student Portal (our Public Scoreboard)
+      togglePortalMode('student');
+      // Set default active tab to Clash (House Cup Standings)
+      switchStudentTab('clash');
+      
+      // Auto-start TV Loop signage mode if URL parameter ?tv=true is present
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get('tv') === 'true') {
+        toggleTvLoop();
+      }
+      
       // hydrateMTSSTabs();
       // renderCCTimeline();
       if (window.initMTSSDatabase) window.initMTSSDatabase();
@@ -8824,7 +8700,7 @@
     // =========================================================================
     // STUDENT PORTAL TAB CONTROLLERS
     // =========================================================================
-    let currentStudentTab = 'shoutout';
+    let currentStudentTab = 'clash';
     function switchStudentTab(tabId) {
       currentStudentTab = tabId;
       playSynthClick();
@@ -8839,14 +8715,43 @@
         activeEl.classList.remove('hidden');
       }
 
-      // Toggle selected button states
+      // Toggle selected button states for horizontal scoreboard tabs
       document.querySelectorAll('#student-portal-workspace nav button').forEach(btn => {
-        btn.className = "flex items-center space-x-3 px-4 py-3 rounded-xl font-bold transition-all duration-200 text-xs text-slate-650 hover:bg-slate-100 hover:text-copley-blue border-l-4 border-transparent text-left w-full";
+        if (btn.id === 'tvLoopBtn') return;
+        btn.className = "flex items-center space-x-2 px-4 py-2.5 rounded-xl font-bold transition-all duration-200 text-xs text-slate-650 hover:bg-slate-100 hover:text-copley-blue select-none";
       });
 
       const activeBtn = document.getElementById(`snav-${tabId}`);
       if (activeBtn) {
-        activeBtn.className = "flex items-center space-x-3 px-4 py-3 rounded-xl font-bold transition-all duration-200 text-xs shadow-md bg-copley-blue text-copley-gold border-l-4 border-copley-gold text-left w-full";
+        activeBtn.className = "flex items-center space-x-2 px-4 py-2.5 rounded-xl font-black transition-all duration-200 text-xs shadow-md bg-copley-blue text-copley-gold border border-copley-gold/20 select-none";
+      }
+    }
+
+    let tvLoopInterval = null;
+    function toggleTvLoop() {
+      playSynthBasicClick();
+      const tvBtn = document.getElementById('tvLoopBtn');
+      const tvIcon = document.getElementById('tvLoopIcon');
+      const tvText = document.getElementById('tvLoopText');
+      
+      if (tvLoopInterval) {
+        // Stop Loop
+        clearInterval(tvLoopInterval);
+        tvLoopInterval = null;
+        tvIcon.className = "fa-solid fa-play text-xs text-emerald-600";
+        tvText.innerText = "Play TV Slide Loop";
+        showToast("TV Loop Paused", "Digital signage automatic cycling stopped.");
+      } else {
+        // Start Loop
+        tvIcon.className = "fa-solid fa-pause text-xs text-rose-500";
+        tvText.innerText = "Pause TV Slide Loop";
+        showToast("TV Loop Started", "Scoreboard is now cycling slides automatically every 20 seconds.");
+        
+        const tabs = ['clash', 'raffle', 'leaderboard'];
+        tvLoopInterval = setInterval(function() {
+          let nextIdx = (tabs.indexOf(currentStudentTab) + 1) % tabs.length;
+          switchStudentTab(tabs[nextIdx]);
+        }, 20000); // 20 seconds slide interval
       }
     }
 

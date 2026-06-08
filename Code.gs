@@ -285,3 +285,350 @@ function compileStaffDigestHTML(name, praiseCount, mtssCount) {
   
   return html;
 }
+
+/**
+ * Scans Denise's Google Drive folder containing student MTSS JSON tracking sheets.
+ * In a local simulation, it detects the environment and uses Node's filesystem module
+ * to parse the mock files.
+ *
+ * PRODUCTION GOOGLE DRIVE BEHAVIOR:
+ * 1. Locates the folder containing individual student JSON files by ID.
+ * 2. Iterates through all files.
+ * 3. Parses JSON content using Utilities and JSON.parse.
+ * 4. Filters, compiles, and groups outstanding items by Teacher Email.
+ *
+ * @param {string} folderId The Google Drive Folder ID (simulated locally).
+ * @returns {Object} Outstanding cases grouped by teacher email.
+ */
+function scanDeniseFolder(folderId) {
+  var teacherGroups = {};
+  
+  // Detect if we are running in Node.js (Local Mock Simulation)
+  if (typeof require !== 'undefined' && typeof process !== 'undefined') {
+    try {
+      var fs = require('fs');
+      var path = require('path');
+      // Resolve path to local mock directory
+      var mockDir = path.resolve(__dirname, 'google-mock', 'denise-individual-sheets');
+      if (fs.existsSync(mockDir)) {
+        var files = fs.readdirSync(mockDir);
+        files.forEach(function(fileName) {
+          if (fileName.endsWith('.json')) {
+            var filePath = path.join(mockDir, fileName);
+            var fileContent = fs.readFileSync(filePath, 'utf8');
+            try {
+              var student = JSON.parse(fileContent);
+              processStudentData(student, teacherGroups);
+            } catch (err) {
+              console.error("Local Mock: Error parsing " + fileName + ": " + err.message);
+            }
+          }
+        });
+        return teacherGroups;
+      }
+    } catch (nodeErr) {
+      if (typeof Logger !== 'undefined') {
+        Logger.log("Local Mock execution failed: " + nodeErr.toString());
+      }
+    }
+  }
+
+  // --- PRODUCTION GOOGLE DRIVE APPS SCRIPT PATH ---
+  // If we reach here, we are running in the Google Workspace cloud environment
+  if (typeof DriveApp !== 'undefined') {
+    try {
+      var folder = DriveApp.getFolderById(folderId || "YOUR_DENISE_FOLDER_ID_HERE");
+      var files = folder.getFiles();
+      
+      while (files.hasNext()) {
+        var file = files.next();
+        var name = file.getName();
+        if (name.toLowerCase().indexOf('.json') !== -1 || file.getMimeType() === "application/json") {
+          try {
+            var content = file.getBlob().getDataAsString();
+            var student = JSON.parse(content);
+            processStudentData(student, teacherGroups);
+          } catch (parseError) {
+            Logger.log("Production: Failed to parse student sheet " + name + ": " + parseError.toString());
+          }
+        }
+      }
+    } catch (driveError) {
+      Logger.log("Production: Failed to read from Google Drive folder: " + driveError.toString());
+    }
+  } else {
+    // If running in some other JS engine/browser sandboxes where DriveApp is not defined
+    if (typeof Logger !== 'undefined') {
+      Logger.log("DriveApp is not defined. Ensure you are running in Google Apps Script or a supported local Node environment.");
+    }
+  }
+
+  return teacherGroups;
+}
+
+/**
+ * Helper to process student JSON record and group by teacher email
+ */
+function processStudentData(student, teacherGroups) {
+  if (!student || !student.teacherEmail) return;
+  
+  var email = student.teacherEmail.trim().toLowerCase();
+  if (!teacherGroups[email]) {
+    teacherGroups[email] = [];
+  }
+  
+  // Extract and format clean details to avoid exposing full sensitive records
+  teacherGroups[email].push({
+    studentName: student.studentName || "Anonymous Student",
+    class: student.class || "Unknown Course",
+    mod: student.mod || "N/A",
+    trigger: student.trigger || "General Check-In",
+    startDate: student.startDate || "",
+    durationWeeks: student.durationWeeks || 0,
+    status: student.status || "Active",
+    interactionsCount: (student.interactions || []).length,
+    parentContactsCount: (student.parentContacts || []).length,
+    lastInteraction: student.interactions && student.interactions.length > 0 
+      ? student.interactions[student.interactions.length - 1].date 
+      : "None"
+  });
+}
+
+/**
+ * Processes a list of VSO/Appreciation slips and calculates cumulative House and Department scores.
+ * Implements the asymmetrical point economy and supports optional Pep Assembly overrides.
+ *
+ * ASYMMETRICAL POINT RULES:
+ * 1. Student Shout-Out (Student-to-Staff VSO):
+ *    - The student who sent the VSO earns 2 points for their House (Copley or Fairlawn).
+ *    - The teacher's Department receives 10 points.
+ * 2. Staff-to-Student Praise Slip (Staff-to-Student VSO):
+ *    - The student who received the VSO earns 10 points for their House.
+ *    - The teacher's Department receives 10 points.
+ *
+ * PEP ASSEMBLY OVERRIDES:
+ * - pepOverrides.multiplier (number): Multiply all points earned from slips (e.g., 2.0 for double points).
+ * - pepOverrides.flatPoints (object): Add flat point bonuses directly to houses (e.g., { "Copley": 100, "Fairlawn": 50 }).
+ *
+ * @param {Array<Object>} slips List of slip/VSO objects.
+ * @param {Object} [pepOverrides] Optional overrides for Pep Assemblies.
+ * @returns {Object} Cumulative results containing House and Department point totals.
+ */
+function calculateHousePoints(slips, pepOverrides) {
+  var results = {
+    houses: {
+      "Copley": 0,
+      "Fairlawn": 0
+    },
+    departments: {}
+  };
+
+  // Safe check
+  if (!slips || !Array.isArray(slips)) return results;
+  
+  // Resolve overrides
+  pepOverrides = pepOverrides || {};
+  var multiplier = parseFloat(pepOverrides.multiplier) || 1.0;
+  var flatPoints = pepOverrides.flatPoints || {};
+
+  // Department mapping helper (simulated inside Apps Script using the absolute source of truth)
+  var STAFF_DEPARTMENTS = {
+    // Math Department
+    "Maggie Zook": "Math",
+    "Allison Allen": "Math",
+    "Doug Allen": "Math",
+    "Michelle Flanagan": "Math",
+    
+    // English Department
+    "Sarah Janiga": "English",
+    "Kim Carothers": "English",
+    "Amy Davis": "English",
+    
+    // Science Department
+    "Patrick Bulford": "Science",
+    "Alexandria Diana": "Science",
+    "Joshua Eck": "Science",
+    "Stephen Gambaccini": "Science",
+    
+    // Social Studies Department
+    "Samantha Beagle": "Soc Studies",
+    "Justin Beard": "Soc Studies",
+    "Scott Chouinard": "Soc Studies",
+    "Candice Chupek": "Soc Studies",
+    "Jim Dies": "Soc Studies",
+    
+    // Support and Counseling
+    "Amy Gray": "School Counseling",
+    "Dan Campana": "School Counseling",
+    "Christa Fuller": "School Counseling",
+    
+    // Other fallbacks
+    "Lee Malcolm": "Spec Ed",
+    "Maggie Steffen": "Spec Ed",
+    "Tim Oden": "Music"
+  };
+
+  // Loop through slips
+  slips.forEach(function(slip) {
+    // Only count approved/valid slips
+    if (slip.status && slip.status.toLowerCase() === "pending") {
+      return; // Skip pending slips
+    }
+
+    var studentHouse = "Copley"; // Fallback default
+    var staffName = "";
+    var pointsToHouse = 0;
+    var pointsToDept = 10; // 10 points base to department
+
+    // Distinguish type:
+    // If it's a student-to-staff shoutout, the sender is a student and the receiver is a staff member.
+    // If it's a staff-to-student praise, the sender is a staff member and the receiver is a student.
+    
+    var isStaffToStudent = false;
+    
+    // We check if sender is a known student (in student house mapping)
+    var senderName = slip.sender || slip.studentName || "";
+    var receiverName = slip.receiver || slip.teacher || slip.teacherName || "";
+    
+    var senderIsStudent = STUDENT_HOUSE_MAPPING.hasOwnProperty(senderName);
+    var receiverIsStudent = STUDENT_HOUSE_MAPPING.hasOwnProperty(receiverName);
+
+    if (receiverIsStudent) {
+      // Staff-to-Student Praise Slip
+      isStaffToStudent = true;
+      studentHouse = STUDENT_HOUSE_MAPPING[receiverName] || "Copley";
+      staffName = senderName;
+      pointsToHouse = 10; // Student VSO received = 10 pts
+    } else {
+      // Student-to-Staff Shoutout
+      studentHouse = STUDENT_HOUSE_MAPPING[senderName] || "Copley";
+      staffName = receiverName;
+      pointsToHouse = 2; // Student VSO sent = 2 pts
+    }
+
+    // Apply multiplier
+    var finalHousePoints = pointsToHouse * multiplier;
+    var finalDeptPoints = pointsToDept * multiplier;
+
+    // Credit House
+    if (results.houses[studentHouse] !== undefined) {
+      results.houses[studentHouse] += finalHousePoints;
+    }
+
+    // Credit Staff Department
+    var dept = STAFF_DEPARTMENTS[staffName] || "General Staff";
+    if (!results.departments[dept]) {
+      results.departments[dept] = 0;
+    }
+    results.departments[dept] += finalDeptPoints;
+  });
+
+  // Apply flat Pep Assembly bonus points
+  for (var house in flatPoints) {
+    if (results.houses[house] !== undefined) {
+      results.houses[house] += parseFloat(flatPoints[house]) || 0;
+    }
+  }
+
+  return results;
+}
+
+/**
+ * Automatically updates a Google Slides presentation with the latest approved featured shout-outs.
+ * This function operates entirely within the secure Google Workspace ecosystem (FERPA-compliant),
+ * reading approved shout-outs from the GenYES_Moderation_Queue sheet, and generating visual slides.
+ *
+ * How it works:
+ * 1. Opens the target Slides Presentation by ID.
+ * 2. Finds the second slide (or first slide) as a template.
+ * 3. Clears old generated slides (keeping the template/title slide).
+ * 4. Pulls the latest N approved shoutouts from the GenYES Moderation Queue sheet.
+ * 5. For each shoutout, duplicates the template slide and replaces placeholders:
+ *    - {{MESSAGE}} -> The appreciation text
+ *    - {{TEACHER}} -> The target staff/teacher name
+ *    - {{SENDER}} -> "Anonymous" or the student's name/ID depending on preference.
+ *    - {{CATEGORY}} -> The appreciation category (e.g. GOAT VSO)
+ * 
+ * @param {string} presentationId The Google Slides File ID.
+ * @param {number} [limit] Maximum number of shout-outs to display (default: 10).
+ */
+function updateFeaturedShoutOutSlides(presentationId, limit) {
+  limit = limit || 10;
+  if (!presentationId || presentationId === "YOUR_SLIDES_PRESENTATION_ID_HERE") {
+    Logger.log("Google Slides update skipped: No valid presentationId provided.");
+    return;
+  }
+
+  try {
+    var deck = SlidesApp.openById(presentationId);
+    var slides = deck.getSlides();
+    if (slides.length === 0) {
+      Logger.log("Error: Target Slides presentation is empty.");
+      return;
+    }
+
+    // Use the first slide or second slide as the template
+    // We assume the first slide is the Title/Intro, and the second slide is the Shout-out Template
+    var templateSlide = slides.length > 1 ? slides[1] : slides[0];
+
+    // Read approved shoutouts from GenYES Moderation Queue
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var modSheet = ss.getSheetByName(CONFIG.MODERATION_SHEET_NAME);
+    if (!modSheet) {
+      Logger.log("Moderation queue sheet not found. Cannot populate slides.");
+      return;
+    }
+
+    var data = modSheet.getDataRange().getValues();
+    var approvedShoutouts = [];
+
+    // Columns: [0] Timestamp, [1] Sender, [2] House, [3] Target Staff, [4] Category, [5] Message, [6] Anonymous, [7] Status
+    for (var i = data.length - 1; i >= 1; i--) {
+      var status = data[i][7] ? data[i][7].toString().trim() : "";
+      if (status.toLowerCase() === "approved") {
+        var isAnonymous = data[i][6] && data[i][6].toString().toLowerCase() === "yes";
+        approvedShoutouts.push({
+          sender: isAnonymous ? "Anonymous Copley Indian" : (data[i][1] || "Anonymous"),
+          teacher: data[i][3] || "Staff Member",
+          category: data[i][4] || "Shout-out",
+          message: data[i][5] || ""
+        });
+        if (approvedShoutouts.length >= limit) {
+          break;
+        }
+      }
+    }
+
+    if (approvedShoutouts.length === 0) {
+      Logger.log("No approved shout-outs found to push to slides.");
+      return;
+    }
+
+    // Delete existing shout-out slides from previous runs to avoid growing indefinitely
+    // We keep slide 0 (Title) and slide 1 (Template)
+    var slidesToDelete = [];
+    for (var j = slides.length - 1; j >= 2; j--) {
+      slidesToDelete.push(slides[j]);
+    }
+    slidesToDelete.forEach(function(s) {
+      s.remove();
+    });
+
+    // Generate new slides by duplicating the template slide
+    approvedShoutouts.forEach(function(shoutout) {
+      var newSlide = deck.appendSlide(templateSlide);
+      
+      // Replace placeholders in the newly created slide
+      newSlide.replaceAllText("{{MESSAGE}}", shoutout.message);
+      newSlide.replaceAllText("{{TEACHER}}", shoutout.teacher);
+      newSlide.replaceAllText("{{SENDER}}", shoutout.sender);
+      newSlide.replaceAllText("{{CATEGORY}}", shoutout.category);
+    });
+
+    Logger.log("Successfully generated " + approvedShoutouts.length + " featured shout-out slides!");
+  } catch (err) {
+    Logger.log("Failed to update Google Slides: " + err.toString());
+  }
+}
+
+
