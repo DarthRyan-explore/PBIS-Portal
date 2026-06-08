@@ -64,16 +64,19 @@ function onFormSubmitTrigger(e) {
 function processShoutoutSubmission(values) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   
-  // Columns mapping assuming Google Form layout:
-  // [0] Timestamp, [1] Sender Name, [2] Target Teacher, [3] Category, [4] Phrasing/Message, [5] Anonymous (Yes/No)
+  // Columns mapping adjusted for Google Form verification & Name splitting:
+  // [0] Timestamp, [1] Email Address, [2] First Name, [3] Last Name, [4] Target Staff, [5] Category, [6] Message, [7] Anonymous (Yes/No)
   var timestamp = values[0];
-  var sender = values[1] || "Anonymous";
-  var teacher = values[2] || "";
-  var category = values[3] || "";
-  var message = values[4] || "";
-  var isAnonymous = (values[5] || "").toString().toLowerCase() === "yes";
+  var email = values[1] || "";
+  var firstName = (values[2] || "").toString().trim();
+  var lastName = (values[3] || "").toString().trim();
+  var sender = (firstName + " " + lastName).trim() || "Anonymous Student";
+  var teacher = values[4] || "";
+  var category = values[5] || "";
+  var message = values[6] || "";
+  var isAnonymous = (values[7] || "").toString().toLowerCase() === "yes";
   
-  Logger.log("Processing Shout-out from " + sender + " to " + teacher);
+  Logger.log("Processing Shout-out from " + sender + " (" + email + ") to " + teacher);
   
   // Resolve House mapping
   var house = STUDENT_HOUSE_MAPPING[sender] || "Copley"; // Default fallback
