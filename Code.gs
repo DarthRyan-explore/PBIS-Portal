@@ -237,14 +237,17 @@ function sendWeeklyDigest() {
   var teacherCaseloads = scanDeniseFolder(CONFIG.DENISE_FOLDER_ID);
   
   var outstandingReminders = {};
+  var activeCaseloadSizes = {};
   for (var staffName in staffRecipients) {
     var stats = staffRecipients[staffName];
     var teacherEmail = stats.email ? stats.email.trim().toLowerCase() : "";
     var caseload = teacherCaseloads[teacherEmail] || [];
     
     var count = 0;
+    var activeCount = 0;
     caseload.forEach(function(student) {
       if (student.status && student.status.toLowerCase() === "active") {
+        activeCount++;
         var cleanStudentName = student.studentName.trim().toLowerCase();
         if (!loggedThisWeek[cleanStudentName]) {
           count++;
@@ -253,6 +256,7 @@ function sendWeeklyDigest() {
     });
     
     outstandingReminders[staffName] = count;
+    activeCaseloadSizes[staffName] = activeCount;
   }
 
   // Send digests to staff
@@ -265,8 +269,9 @@ function sendWeeklyDigest() {
     // Check if staff classification is Teacher (support staff don't do MTSS strategy reviews)
     var isTeacher = stats.classification ? stats.classification.toLowerCase().indexOf("teacher") !== -1 : true;
     var mtssCount = isTeacher ? (outstandingReminders[staffName] || 0) : 0;
+    var activeCaseloadCount = isTeacher ? (activeCaseloadSizes[staffName] || 0) : 0;
     
-    var htmlBody = compileStaffDigestHTML(staffName, stats.received, mtssCount, isTeacher);
+    var htmlBody = compileStaffDigestHTML(staffName, stats.received, mtssCount, isTeacher, activeCaseloadCount);
     
     if (CONFIG.DEBUG_MODE) {
       Logger.log("[DEBUG MODE] Would send email to: " + stats.email + " with Subject: Weekly PBIS Digest (Teacher: " + isTeacher + ")");
@@ -288,13 +293,30 @@ function sendWeeklyDigest() {
 /**
  * Compiles a beautifully formatted Copley High School HTML newsletter for Staff
  */
-function compileStaffDigestHTML(name, praiseCount, mtssCount, isTeacher) {
+function compileStaffDigestHTML(name, praiseCount, mtssCount, isTeacher, activeCaseloadCount) {
   isTeacher = isTeacher !== false; // Default to true if not specified
+  activeCaseloadCount = activeCaseloadCount || 0;
   var mtssSection = "";
   var mtssFormUrl = CONFIG.MTSS_FORM_URL || "https://docs.google.com/forms/d/e/1FAIpQLSdf_staff_mtss_log_form_placeholder/viewform";
   
   if (isTeacher) {
-    if (mtssCount > 0) {
+    if (activeCaseloadCount === 0) {
+      var mtssNoCaseloads = [
+        "You currently have no students on your active Tier 1 caseload. You have successfully Matrix-dodged additional paperwork this week. Enjoy the peace while it lasts.",
+        "Your active caseload is currently empty. No strategy logging required. Go ahead and take credit for a job well done anyway.",
+        "No active caseload students assigned to you this week. Zero paperwork due. Have a relaxing, form-free weekend!"
+      ];
+      var mtssNoCaseloadText = mtssNoCaseloads[Math.floor(Math.random() * mtssNoCaseloads.length)];
+      
+      mtssSection = [
+        '<div style="background-color: #f3f4f6; border: 1px solid #e5e7eb; border-radius: 12px; padding: 15px; margin-top: 20px;">',
+        '  <h3 style="color: #4b5563; margin-top: 0; font-family: sans-serif; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px;">📋 MTSS Caseload: Empty</h3>',
+        '  <p style="color: #6b7280; font-size: 13px; margin: 0; line-height: 1.5;">',
+        '    ' + mtssNoCaseloadText,
+        '  </p>',
+        '</div>'
+      ].join('\n');
+    } else if (mtssCount > 0) {
       var mtssWarnings = [
         "Look, we all love paperwork. Okay, maybe not. But you currently have <strong>" + mtssCount + "</strong> outstanding student MTSS Tier 1 strategy logs due. Let's get these documented so we can pretend we have our lives completely together.",
         "A quick heads-up: there are <strong>" + mtssCount + "</strong> outstanding MTSS Tier 1 strategy logs with your name on them. Let's get these filed before Denise has to hunt us down.",
@@ -960,7 +982,7 @@ function sendTestDigestToMe() {
   var myEmail = Session.getActiveUser().getEmail();
   Logger.log("Compiling mock digest for testing...");
   
-  var htmlBody = compileStaffDigestHTML("Test Instructor", 3, 2);
+  var htmlBody = compileStaffDigestHTML("Test Instructor", 3, 2, true, 4);
   
   MailApp.sendEmail({
     to: myEmail,
