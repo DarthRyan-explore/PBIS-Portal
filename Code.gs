@@ -165,9 +165,7 @@ function getSystemConfig() {
         var key = data[i][0] ? data[i][0].toString().trim() : "";
         var val = data[i][1] ? data[i][1].toString().trim() : "";
         if (key && val) {
-          if (key === "DENISE_FOLDER_ID" || key === "MTSS_FORM_URL") {
-            config[key] = val;
-          }
+          config[key] = val;
         }
       }
     }
@@ -350,6 +348,42 @@ function sendWeeklyDigest() {
 /**
  * Compiles a beautifully formatted Copley High School HTML newsletter for Staff
  */
+/**
+ * Helper to build a pre-filled Google Form URL for a specific student's caseload intervention.
+ * Reads field parameter IDs from _System_Config sheet tab if present (e.g. entry.12345).
+ */
+function getPreFilledFormUrl(s, sysConfig) {
+  var url = sysConfig.MTSS_FORM_URL || "https://docs.google.com/forms/d/e/1FAIpQLSdf_staff_mtss_log_form_placeholder/viewform";
+  if (url.indexOf("viewform") === -1) return url;
+  
+  var params = [];
+  
+  // Try to parse first and last name
+  var nameParts = s.name.trim().split(" ");
+  var firstName = nameParts[0] || "";
+  var lastName = nameParts.slice(1).join(" ") || "";
+  
+  // Load entry IDs from configuration dynamically
+  var entryFirstName = sysConfig.FORM_FIELD_FIRST_NAME || "entry.111111"; // Default placeholders
+  var entryLastName = sysConfig.FORM_FIELD_LAST_NAME || "entry.222222";
+  var entryClass = sysConfig.FORM_FIELD_CLASS || "entry.333333";
+  var entryMod = sysConfig.FORM_FIELD_MOD || "entry.444444";
+  
+  if (firstName) params.push(entryFirstName + "=" + encodeURIComponent(firstName));
+  if (lastName) params.push(entryLastName + "=" + encodeURIComponent(lastName));
+  if (s.class) params.push(entryClass + "=" + encodeURIComponent(s.class));
+  if (s.mod) params.push(entryMod + "=" + encodeURIComponent(s.mod));
+  
+  if (params.length > 0) {
+    var separator = url.indexOf("?") === -1 ? "?" : "&";
+    return url + separator + params.join("&");
+  }
+  return url;
+}
+
+/**
+ * Compiles a beautifully formatted Copley High School HTML newsletter for Staff
+ */
 function compileStaffDigestHTML(name, praiseCount, mtssCount, isTeacher, activeCaseloadCount, outstandingStudents) {
   isTeacher = isTeacher !== false; // Default to true if not specified
   activeCaseloadCount = activeCaseloadCount || 0;
@@ -386,9 +420,11 @@ function compileStaffDigestHTML(name, praiseCount, mtssCount, isTeacher, activeC
       
       var studentRows = [];
       (outstandingStudents || []).forEach(function(s) {
+        var preFilledUrl = getPreFilledFormUrl(s, sysConfig);
         studentRows.push(
           '    <li style="margin-bottom: 6px;">',
           '      <strong>' + s.name + '</strong> — <em>' + s.class + ' (' + s.mod + ')</em>',
+          '      <a href="' + preFilledUrl + '" target="_blank" style="color: #be123c; margin-left: 10px; font-size: 11px; text-decoration: underline; font-weight: bold;">Log Intervention</a>',
           '    </li>'
         );
       });
