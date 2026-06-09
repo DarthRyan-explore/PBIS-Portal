@@ -20,6 +20,7 @@ var CONFIG = {
   DISTRICT_DOMAIN: "copley-fairlawn.org",
   EMAIL_SENDER_NAME: "Copley High School PBIS System",
   DENISE_FOLDER_ID: "YOUR_DENISE_FOLDER_ID_HERE", // Folder ID containing student caseload JSONs
+  MTSS_FORM_URL: "https://docs.google.com/forms/d/e/1FAIpQLSdf_staff_mtss_log_form_placeholder/viewform", // URL to staff MTSS Tier 1 logging Google Form
   DEBUG_MODE: true // SAFETY GATE: Set to true to prevent sending live emails during testing
 };
 
@@ -290,24 +291,41 @@ function sendWeeklyDigest() {
 function compileStaffDigestHTML(name, praiseCount, mtssCount, isTeacher) {
   isTeacher = isTeacher !== false; // Default to true if not specified
   var mtssSection = "";
+  var mtssFormUrl = CONFIG.MTSS_FORM_URL || "https://docs.google.com/forms/d/e/1FAIpQLSdf_staff_mtss_log_form_placeholder/viewform";
   
   if (isTeacher) {
     if (mtssCount > 0) {
+      var mtssWarnings = [
+        "Look, we all love paperwork. Okay, maybe not. But you currently have <strong>" + mtssCount + "</strong> outstanding student MTSS Tier 1 strategy logs due. Let's get these documented so we can pretend we have our lives completely together.",
+        "A quick heads-up: there are <strong>" + mtssCount + "</strong> outstanding MTSS Tier 1 strategy logs with your name on them. Let's get these filed before Denise has to hunt us down.",
+        "Friendly reminder (or as friendly as an automated bot can be): you have <strong>" + mtssCount + "</strong> active caseload students missing their weekly MTSS log. Click below to make the red box go away.",
+        "Just a minor detail, but you've got <strong>" + mtssCount + "</strong> student MTSS logs outstanding this week. Take a quick moment to log them so we can keep the records clean and tidy."
+      ];
+      var mtssWarningText = mtssWarnings[Math.floor(Math.random() * mtssWarnings.length)];
+      
       mtssSection = [
         '<div style="background-color: #fff1f2; border: 1px solid #fecdd3; border-radius: 12px; padding: 15px; margin-top: 20px;">',
         '  <h3 style="color: #be123c; margin-top: 0; font-family: sans-serif; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px;">⚠️ Minor Detail (Action Required)</h3>',
         '  <p style="color: #4b5563; font-size: 13px; margin: 5px 0; line-height: 1.5;">',
-        '    Look, we all love paperwork. Okay, maybe not. But you currently have <strong>' + mtssCount + '</strong> outstanding student MTSS Tier 1 strategy logs due. Let\'s get these documented so we can pretend we have our lives completely together.',
+        '    ' + mtssWarningText,
         '  </p>',
-        '  <a href="https://docs.google.com/forms/d/e/1FAIpQLSdf_staff_mtss_log_form_placeholder/viewform" target="_blank" style="background-color: #be123c; color: white; padding: 8px 15px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 11px; display: inline-block; margin-top: 8px; text-transform: uppercase; letter-spacing: 0.5px;">Log Strategies</a>',
+        '  <a href="' + mtssFormUrl + '" target="_blank" style="background-color: #be123c; color: white; padding: 8px 15px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 11px; display: inline-block; margin-top: 8px; text-transform: uppercase; letter-spacing: 0.5px;">Log Strategies</a>',
         '</div>'
       ].join('\n');
     } else {
+      var mtssClears = [
+        "Look at you. Zero outstanding MTSS logs. Go buy yourself a coffee, or take an extra long deep breath. You earned it.",
+        "MTSS status: clean. Zero outstanding logs. You are officially an overachiever. Keep it up.",
+        "No outstanding MTSS logs. Denise is happy, you're happy, I'm happy. Well, as happy as code can get. Have a great weekend!",
+        "Zero outstanding MTSS logs due. Seriously, teach us your secrets. Have a relaxing weekend."
+      ];
+      var mtssClearText = mtssClears[Math.floor(Math.random() * mtssClears.length)];
+      
       mtssSection = [
         '<div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 15px; margin-top: 20px;">',
         '  <h3 style="color: #15803d; margin-top: 0; font-family: sans-serif; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px;">✅ MTSS Review Status: Clear</h3>',
         '  <p style="color: #4b5563; font-size: 13px; margin: 0; line-height: 1.5;">',
-        '    Look at you. Zero outstanding MTSS logs. Go buy yourself a coffee, or take an extra long deep breath. You earned it.',
+        '    ' + mtssClearText,
         '  </p>',
         '</div>'
       ].join('\n');
@@ -315,11 +333,23 @@ function compileStaffDigestHTML(name, praiseCount, mtssCount, isTeacher) {
   }
 
   // Witty greeting sentences (Ryan Reynolds style)
-  var greetings = [
-    "Hey " + name + ". Look at that, you made it to Friday. And turns out, people actually noticed you doing great things this week.",
-    "Well " + name + ", another week down. The good news? You've got some fan mail.",
-    "Hey " + name + ". Grab a coffee and sit down. We compiled your weekly appreciation digest, and you actually did pretty great."
-  ];
+  var greetings = [];
+  if (praiseCount > 0) {
+    greetings = [
+      "Hey " + name + ". Look at that, you made it to Friday. And turns out, people actually noticed you doing great things this week. You received " + praiseCount + " shout-out(s)!",
+      "Well " + name + ", another week down. The good news? You've got some fan mail. " + praiseCount + " shout-out(s), to be exact.",
+      "Hey " + name + ". Grab a coffee and sit down. We compiled your weekly appreciation digest, and you actually did pretty great (+" + (praiseCount * 10) + " department points).",
+      "Hey " + name + ". Good news: you got " + praiseCount + " shout-out(s) this week. Bad news: I still don't have a coffee for you. But hey, take the win.",
+      "Well, " + name + ", you did it. You survived the week, AND you actually managed to inspire some students. You've got " + praiseCount + " shout-out(s) waiting."
+    ];
+  } else {
+    greetings = [
+      "Hey " + name + ". You made it to Friday. No specific shout-outs this week, but honestly, just getting to the weekend is a solid accomplishment.",
+      "Well " + name + ", another week down. Quiet on the fan mail front this week, but we still appreciate you keeping the wheels turning.",
+      "Hey " + name + ". Grab a coffee and relax. No shout-outs logged for you this week, but hey, less emails for you to read, right?",
+      "Hey " + name + ". Happy Friday! The universe was quiet on the VSO front for you this week, but your department still needs you."
+    ];
+  }
   var greetingText = greetings[Math.floor(Math.random() * greetings.length)];
 
   var html = [
@@ -336,7 +366,7 @@ function compileStaffDigestHTML(name, praiseCount, mtssCount, isTeacher) {
     '      ' + greetingText,
     '    </p>',
     '    <p style="color: #4b5563; font-size: 13px; line-height: 1.6;">',
-    '      Here is your weekly summary of the Virtual Shout-Outs (VSOs) and points logged. Students who sent or received a shout-out are eligible to spin the PBIS lobby prize wheel today (Friday) for some glorious rewards.',
+    '      Here is your weekly summary of the Virtual Shout-Outs (VSOs) and points logged. Students who sent or received a shout-out are eligible to spin the PBIS prize wheel in the commons today (Friday) for some glorious rewards.',
     '    </p>',
     '    ',
     '    <!-- Stats Card Grid -->',
@@ -387,6 +417,17 @@ function compileStaffDigestHTML(name, praiseCount, mtssCount, isTeacher) {
  */
 function scanDeniseFolder(folderId) {
   var teacherGroups = {};
+  
+  // Clean folderId if a URL was passed
+  if (folderId) {
+    var match = folderId.toString().trim().match(/\/folders\/([a-zA-Z0-9-_]+)/);
+    if (match && match[1]) {
+      folderId = match[1];
+    } else {
+      folderId = folderId.toString().trim();
+    }
+  }
+  
   
   // Detect if we are running in Node.js (Local Mock Simulation)
   if (typeof require !== 'undefined' && typeof process !== 'undefined') {
