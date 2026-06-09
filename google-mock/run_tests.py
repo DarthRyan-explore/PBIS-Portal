@@ -346,6 +346,11 @@ var DriveApp = {{
 }};
 
 var mockSheets = {{
+  "_System_Config": [
+    ["Setting Name", "Value"],
+    ["DENISE_FOLDER_ID", "dummy-folder-id"],
+    ["MTSS_FORM_URL", "https://docs.google.com/forms/d/e/1FAIpQLSdf_staff_mtss_log_form_placeholder/viewform"]
+  ],
   "Form Responses 1": [
     ["Timestamp", "Email", "First Name", "Last Name", "Target Teacher", "Category", "Message", "Anonymous"],
     [new Date(), "luke.s@copley-fairlawn.org", "Luke", "Skywalker", "Sarah Janiga", "GOAT VSO", "Great teacher!", "No"]

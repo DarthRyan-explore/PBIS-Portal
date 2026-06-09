@@ -146,12 +146,48 @@ function updateHouseCupLedger(ss, houseName, pointsToAdd) {
 }
 
 /**
+ * Loads system configuration settings from the "_System_Config" sheet tab dynamically.
+ * If the sheet doesn't exist, it falls back to hardcoded CONFIG defaults.
+ * This keeps private folder IDs and form links safe from open-source repositories.
+ */
+function getSystemConfig() {
+  var config = {
+    DENISE_FOLDER_ID: CONFIG.DENISE_FOLDER_ID,
+    MTSS_FORM_URL: CONFIG.MTSS_FORM_URL
+  };
+  
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName("_System_Config");
+    if (sheet) {
+      var data = sheet.getDataRange().getValues();
+      for (var i = 0; i < data.length; i++) {
+        var key = data[i][0] ? data[i][0].toString().trim() : "";
+        var val = data[i][1] ? data[i][1].toString().trim() : "";
+        if (key && val) {
+          if (key === "DENISE_FOLDER_ID" || key === "MTSS_FORM_URL") {
+            config[key] = val;
+          }
+        }
+      }
+    }
+  } catch (err) {
+    if (typeof Logger !== 'undefined') {
+      Logger.log("getSystemConfig Error: " + err.toString());
+    }
+  }
+  
+  return config;
+}
+
+/**
  * Compiles and distributes weekly HTML email digests to students and staff
  * Scheduled to run automatically on Friday afternoons
  */
 function sendWeeklyDigest() {
   Logger.log("Compiling Weekly HTML Digests...");
   var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sysConfig = getSystemConfig();
   
   // 1. Gather stats from sheets
   var shoutoutSheet = ss.getSheetByName(CONFIG.SHOUTOUT_FORM_SHEET_NAME);
@@ -177,7 +213,7 @@ function sendWeeklyDigest() {
   }
   if (teacherColIdx === -1) teacherColIdx = 4; // Default to Column E (index 4)
   
-  // Filter for records submitted in the last 7 days
+  // Filter for records submitted in the last 7 days (for shoutouts received)
   var now = new Date();
   var oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
   
@@ -204,8 +240,8 @@ function sendWeeklyDigest() {
     }
   }
   
-  // 3. Compile MTSS Logs submitted in the last 7 days to check check-in activity
-  var loggedThisWeek = {};
+  // 3. Compile MTSS Logs by student name -> array of submission timestamps
+  var studentLogDates = {};
   if (mtssLogs.length > 1) {
     var mtssHeaders = mtssLogs[0];
     var studentFirstCol = -1;
@@ -222,40 +258,60 @@ function sendWeeklyDigest() {
     
     for (var i = 1; i < mtssLogs.length; i++) {
       var logTs = new Date(mtssLogs[i][0]);
-      if (logTs >= oneWeekAgo) {
-        var fName = mtssLogs[i][studentFirstCol] ? mtssLogs[i][studentFirstCol].toString().trim() : "";
-        var lName = mtssLogs[i][studentLastCol] ? mtssLogs[i][studentLastCol].toString().trim() : "";
-        var fullName = (fName + " " + lName).trim().toLowerCase();
-        if (fullName) {
-          loggedThisWeek[fullName] = true;
+      var fName = mtssLogs[i][studentFirstCol] ? mtssLogs[i][studentFirstCol].toString().trim() : "";
+      var lName = mtssLogs[i][studentLastCol] ? mtssLogs[i][studentLastCol].toString().trim() : "";
+      var fullName = (fName + " " + lName).trim().toLowerCase();
+      if (fullName) {
+        if (!studentLogDates[fullName]) {
+          studentLogDates[fullName] = [];
         }
+        studentLogDates[fullName].push(logTs);
       }
     }
   }
 
   // 4. Scan Denise's folder to find active student caseloads grouped by teacher email
-  var teacherCaseloads = scanDeniseFolder(CONFIG.DENISE_FOLDER_ID);
+  var teacherCaseloads = scanDeniseFolder(sysConfig.DENISE_FOLDER_ID);
   
-  var outstandingReminders = {};
-  var activeCaseloadSizes = {};
+  var outstandingReminders = {}; // Maps staffName -> Array of outstanding student objects
+  var activeCaseloadSizes = {}; // Maps staffName -> count
+  
   for (var staffName in staffRecipients) {
     var stats = staffRecipients[staffName];
     var teacherEmail = stats.email ? stats.email.trim().toLowerCase() : "";
     var caseload = teacherCaseloads[teacherEmail] || [];
     
-    var count = 0;
+    var outstandingStudents = [];
     var activeCount = 0;
+    
     caseload.forEach(function(student) {
       if (student.status && student.status.toLowerCase() === "active") {
         activeCount++;
         var cleanStudentName = student.studentName.trim().toLowerCase();
-        if (!loggedThisWeek[cleanStudentName]) {
-          count++;
+        
+        // Find if they have been logged on/after their caseload start date
+        var isLogged = false;
+        var startTs = student.startDate ? new Date(student.startDate) : new Date(0);
+        
+        var logs = studentLogDates[cleanStudentName] || [];
+        for (var j = 0; j < logs.length; j++) {
+          if (logs[j] >= startTs) {
+            isLogged = true;
+            break;
+          }
+        }
+        
+        if (!isLogged) {
+          outstandingStudents.push({
+            name: student.studentName,
+            class: student.class || "Unknown Course",
+            mod: student.mod || "N/A"
+          });
         }
       }
     });
     
-    outstandingReminders[staffName] = count;
+    outstandingReminders[staffName] = outstandingStudents;
     activeCaseloadSizes[staffName] = activeCount;
   }
 
@@ -268,10 +324,11 @@ function sendWeeklyDigest() {
     
     // Check if staff classification is Teacher (support staff don't do MTSS strategy reviews)
     var isTeacher = stats.classification ? stats.classification.toLowerCase().indexOf("teacher") !== -1 : true;
-    var mtssCount = isTeacher ? (outstandingReminders[staffName] || 0) : 0;
+    var outstandingList = isTeacher ? (outstandingReminders[staffName] || []) : [];
+    var mtssCount = outstandingList.length;
     var activeCaseloadCount = isTeacher ? (activeCaseloadSizes[staffName] || 0) : 0;
     
-    var htmlBody = compileStaffDigestHTML(staffName, stats.received, mtssCount, isTeacher, activeCaseloadCount);
+    var htmlBody = compileStaffDigestHTML(staffName, stats.received, mtssCount, isTeacher, activeCaseloadCount, outstandingList);
     
     if (CONFIG.DEBUG_MODE) {
       Logger.log("[DEBUG MODE] Would send email to: " + stats.email + " with Subject: Weekly PBIS Digest (Teacher: " + isTeacher + ")");
@@ -293,11 +350,13 @@ function sendWeeklyDigest() {
 /**
  * Compiles a beautifully formatted Copley High School HTML newsletter for Staff
  */
-function compileStaffDigestHTML(name, praiseCount, mtssCount, isTeacher, activeCaseloadCount) {
+function compileStaffDigestHTML(name, praiseCount, mtssCount, isTeacher, activeCaseloadCount, outstandingStudents) {
   isTeacher = isTeacher !== false; // Default to true if not specified
   activeCaseloadCount = activeCaseloadCount || 0;
   var mtssSection = "";
-  var mtssFormUrl = CONFIG.MTSS_FORM_URL || "https://docs.google.com/forms/d/e/1FAIpQLSdf_staff_mtss_log_form_placeholder/viewform";
+  
+  var sysConfig = getSystemConfig();
+  var mtssFormUrl = sysConfig.MTSS_FORM_URL || "https://docs.google.com/forms/d/e/1FAIpQLSdf_staff_mtss_log_form_placeholder/viewform";
   
   if (isTeacher) {
     if (activeCaseloadCount === 0) {
@@ -318,12 +377,21 @@ function compileStaffDigestHTML(name, praiseCount, mtssCount, isTeacher, activeC
       ].join('\n');
     } else if (mtssCount > 0) {
       var mtssWarnings = [
-        "Look, we all love paperwork. Okay, maybe not. But you currently have <strong>" + mtssCount + "</strong> outstanding student MTSS Tier 1 strategy logs due. Let's get these documented so we can pretend we have our lives completely together.",
-        "A quick heads-up: there are <strong>" + mtssCount + "</strong> outstanding MTSS Tier 1 strategy logs with your name on them. Let's get these filed before Denise has to hunt us down.",
-        "Friendly reminder (or as friendly as an automated bot can be): you have <strong>" + mtssCount + "</strong> active caseload students missing their weekly MTSS log. Click below to make the red box go away.",
-        "Just a minor detail, but you've got <strong>" + mtssCount + "</strong> student MTSS logs outstanding this week. Take a quick moment to log them so we can keep the records clean and tidy."
+        "Look, we all love paperwork. Okay, maybe not. But you currently have outstanding student MTSS Tier 1 strategy logs due. Let's get these documented so we can pretend we have our lives completely together.",
+        "A quick heads-up: there are outstanding MTSS Tier 1 strategy logs with your name on them. Let's get these filed before Denise has to hunt us down.",
+        "Friendly reminder (or as friendly as an automated bot can be): you have active caseload students missing their weekly MTSS log. Click below to make the red box go away.",
+        "Just a minor detail, but you've got student MTSS logs outstanding this week. Take a quick moment to log them so we can keep the records clean and tidy."
       ];
       var mtssWarningText = mtssWarnings[Math.floor(Math.random() * mtssWarnings.length)];
+      
+      var studentRows = [];
+      (outstandingStudents || []).forEach(function(s) {
+        studentRows.push(
+          '    <li style="margin-bottom: 6px;">',
+          '      <strong>' + s.name + '</strong> — <em>' + s.class + ' (' + s.mod + ')</em>',
+          '    </li>'
+        );
+      });
       
       mtssSection = [
         '<div style="background-color: #fff1f2; border: 1px solid #fecdd3; border-radius: 12px; padding: 15px; margin-top: 20px;">',
@@ -331,6 +399,9 @@ function compileStaffDigestHTML(name, praiseCount, mtssCount, isTeacher, activeC
         '  <p style="color: #4b5563; font-size: 13px; margin: 5px 0; line-height: 1.5;">',
         '    ' + mtssWarningText,
         '  </p>',
+        '  <ul style="color: #4b5563; font-size: 13px; margin: 10px 0 10px 20px; padding: 0; line-height: 1.5; list-style-type: disc;">',
+        studentRows.join('\n'),
+        '  </ul>',
         '  <a href="' + mtssFormUrl + '" target="_blank" style="background-color: #be123c; color: white; padding: 8px 15px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 11px; display: inline-block; margin-top: 8px; text-transform: uppercase; letter-spacing: 0.5px;">Log Strategies</a>',
         '</div>'
       ].join('\n');
@@ -982,7 +1053,11 @@ function sendTestDigestToMe() {
   var myEmail = Session.getActiveUser().getEmail();
   Logger.log("Compiling mock digest for testing...");
   
-  var htmlBody = compileStaffDigestHTML("Test Instructor", 3, 2, true, 4);
+  var mockStudents = [
+    { name: "Luke Skywalker", class: "English 11", mod: "Period 1" },
+    { name: "Frodo Baggins", class: "Biology", mod: "Period 6" }
+  ];
+  var htmlBody = compileStaffDigestHTML("Test Instructor", 3, mockStudents.length, true, 4, mockStudents);
   
   MailApp.sendEmail({
     to: myEmail,
