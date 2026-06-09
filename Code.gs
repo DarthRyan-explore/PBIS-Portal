@@ -1054,8 +1054,8 @@ function sendTestDigestToMe() {
   Logger.log("Compiling mock digest for testing...");
   
   var mockStudents = [
-    { name: "Luke Skywalker", class: "English 11", mod: "Period 1" },
-    { name: "Frodo Baggins", class: "Biology", mod: "Period 6" }
+    { name: "Luke Skywalker", class: "English 11", mod: "Mod 14-15" },
+    { name: "Frodo Baggins", class: "Biology", mod: "Mod 10-11" }
   ];
   var htmlBody = compileStaffDigestHTML("Test Instructor", 3, mockStudents.length, true, 4, mockStudents);
   
