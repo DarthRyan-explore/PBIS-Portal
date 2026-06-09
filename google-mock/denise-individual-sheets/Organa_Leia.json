@@ -1,0 +1,19 @@
+{
+  "studentName": "Leia Organa",
+  "teacherEmail": "maggie.zook@copley-fairlawn.org",
+  "class": "Math",
+  "mod": "Period 4",
+  "trigger": "Academic Concern",
+  "startDate": "2026-05-20",
+  "durationWeeks": 6,
+  "status": "Active",
+  "parentContacts": [
+    { "date": "2026-05-22", "method": "Email", "notes": "Notified parents regarding algebra quiz correction requirements." }
+  ],
+  "interventions": [
+    "Learning Lab study hall passes"
+  ],
+  "interactions": [
+    { "date": "2026-05-24", "tags": ["Simple Check-In"], "notes": "Reviewed homework progress. Student requested tutoring for polynomials." }
+  ]
+}

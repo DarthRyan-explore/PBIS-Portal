@@ -1,0 +1,19 @@
+{
+  "studentName": "Frodo Baggins",
+  "teacherEmail": "sarah.janiga@copley-fairlawn.org",
+  "class": "Biology",
+  "mod": "Period 6",
+  "trigger": "Flex Support",
+  "startDate": "2026-05-15",
+  "durationWeeks": 4,
+  "status": "Active",
+  "parentContacts": [
+    { "date": "2026-05-19", "method": "Phone", "notes": "Discussed biology lab safety rules and attendance concerns." }
+  ],
+  "interventions": [
+    "Flex period study block allocation"
+  ],
+  "interactions": [
+    { "date": "2026-05-21", "tags": ["Simple Check-In"], "notes": "Discussed lab notebook layout. Frodo was positive and ready for next lab." }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "studentName": "Luke Skywalker",
+  "teacherEmail": "tom.wilson@copley-fairlawn.org",
+  "class": "English 11",
+  "mod": "Period 1",
+  "trigger": "Ohio SB8 letter grade shift concern",
+  "startDate": "2026-05-18",
+  "durationWeeks": 4,
+  "status": "Active",
+  "parentContacts": [
+    { "date": "2026-05-20", "method": "Phone", "notes": "Spoke to aunt/uncle regarding missing reading logs." }
+  ],
+  "interventions": [
+    "Invite student to Learning Lab"
+  ],
+  "interactions": [
+    { "date": "2026-05-22", "tags": ["Simple Check-In"], "notes": "Encouraged student to attend flex session." }
+  ]
+}

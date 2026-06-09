@@ -19,6 +19,7 @@ var CONFIG = {
   CC_SHEET_NAME: "Check_Connect_Logs",
   DISTRICT_DOMAIN: "copley-fairlawn.org",
   EMAIL_SENDER_NAME: "Copley High School PBIS System",
+  DENISE_FOLDER_ID: "YOUR_DENISE_FOLDER_ID_HERE", // Folder ID containing student caseload JSONs
   DEBUG_MODE: true // SAFETY GATE: Set to true to prevent sending live emails during testing
 };
 
@@ -202,12 +203,56 @@ function sendWeeklyDigest() {
     }
   }
   
-  // Count outstanding MTSS logs (mock check)
-  var outstandingReminders = {
-    "Sarah Janiga": 3,
-    "Lee Malcolm": 2,
-    "Maggie Steffen": 0
-  };
+  // 3. Compile MTSS Logs submitted in the last 7 days to check check-in activity
+  var loggedThisWeek = {};
+  if (mtssLogs.length > 1) {
+    var mtssHeaders = mtssLogs[0];
+    var studentFirstCol = -1;
+    var studentLastCol = -1;
+    
+    for (var c = 0; c < mtssHeaders.length; c++) {
+      var h = mtssHeaders[c].toString().toLowerCase().trim();
+      if (h.indexOf("first name") !== -1 || h.indexOf("student first") !== -1) studentFirstCol = c;
+      else if (h.indexOf("last name") !== -1 || h.indexOf("student last") !== -1) studentLastCol = c;
+    }
+    
+    if (studentFirstCol === -1) studentFirstCol = 2; // Column C fallback
+    if (studentLastCol === -1) studentLastCol = 3;  // Column D fallback
+    
+    for (var i = 1; i < mtssLogs.length; i++) {
+      var logTs = new Date(mtssLogs[i][0]);
+      if (logTs >= oneWeekAgo) {
+        var fName = mtssLogs[i][studentFirstCol] ? mtssLogs[i][studentFirstCol].toString().trim() : "";
+        var lName = mtssLogs[i][studentLastCol] ? mtssLogs[i][studentLastCol].toString().trim() : "";
+        var fullName = (fName + " " + lName).trim().toLowerCase();
+        if (fullName) {
+          loggedThisWeek[fullName] = true;
+        }
+      }
+    }
+  }
+
+  // 4. Scan Denise's folder to find active student caseloads grouped by teacher email
+  var teacherCaseloads = scanDeniseFolder(CONFIG.DENISE_FOLDER_ID);
+  
+  var outstandingReminders = {};
+  for (var staffName in staffRecipients) {
+    var stats = staffRecipients[staffName];
+    var teacherEmail = stats.email ? stats.email.trim().toLowerCase() : "";
+    var caseload = teacherCaseloads[teacherEmail] || [];
+    
+    var count = 0;
+    caseload.forEach(function(student) {
+      if (student.status && student.status.toLowerCase() === "active") {
+        var cleanStudentName = student.studentName.trim().toLowerCase();
+        if (!loggedThisWeek[cleanStudentName]) {
+          count++;
+        }
+      }
+    });
+    
+    outstandingReminders[staffName] = count;
+  }
 
   // Send digests to staff
   for (var staffName in staffRecipients) {

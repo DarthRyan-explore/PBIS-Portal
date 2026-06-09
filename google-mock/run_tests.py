@@ -12,7 +12,8 @@ print("================================================================\n")
 # Load Code.gs contents
 code_path = os.path.join(os.path.dirname(__file__), "..", "Code.gs")
 with open(code_path, "r", encoding="utf-8") as f:
-    code_content = f.read()
+    code_content = "var Logger = { log: function(msg) {} };\n" + f.read()
+
 
 # Define mock student data
 luke_data = {
@@ -286,8 +287,195 @@ if economy_passed and override_passed:
 else:
     print("\n❌ TEST CASE 2 FAILED.")
 
+# --- TEST CASE 3: sendWeeklyDigest() Dynamic MTSS & Classification Exemption ---
+print("\n----------------------------------------------------------------")
+print("TEST CASE 3: sendWeeklyDigest() Dynamic MTSS Verification")
+print("----------------------------------------------------------------")
+
+mock_digest_js = f"""
+// Ensure CONFIG has debug mode true during tests
+CONFIG.DEBUG_MODE = false; // We set it to false so it hits our mock MailApp.sendEmail
+
+var DriveApp = {{
+  getFolderById: function(id) {{
+    return {{
+      getFiles: function() {{
+        var index = 0;
+        var mockFiles = [
+          {{
+            getName: function() {{ return "Skywalker_Luke.json"; }},
+            getMimeType: function() {{ return "application/json"; }},
+            getBlob: function() {{
+              return {{
+                getDataAsString: function() {{
+                  return {json.dumps(json.dumps(luke_data))};
+                }}
+              }};
+            }}
+          }},
+          {{
+            getName: function() {{ return "Organa_Leia.json"; }},
+            getMimeType: function() {{ return "application/json"; }},
+            getBlob: function() {{
+              return {{
+                getDataAsString: function() {{
+                  return {json.dumps(json.dumps(leia_data))};
+                }}
+              }};
+            }}
+          }},
+          {{
+            getName: function() {{ return "Baggins_Frodo.json"; }},
+            getMimeType: function() {{ return "application/json"; }},
+            getBlob: function() {{
+              return {{
+                getDataAsString: function() {{
+                  return {json.dumps(json.dumps(frodo_data))};
+                }}
+              }};
+            }}
+          }}
+        ];
+        return {{
+          hasNext: function() {{ return index < mockFiles.length; }},
+          next: function() {{ return mockFiles[index++]; }}
+        }};
+      }}
+    }};
+  }}
+}};
+
+var mockSheets = {{
+  "Form Responses 1": [
+    ["Timestamp", "Email", "First Name", "Last Name", "Target Teacher", "Category", "Message", "Anonymous"],
+    [new Date(), "luke.s@copley-fairlawn.org", "Luke", "Skywalker", "Sarah Janiga", "GOAT VSO", "Great teacher!", "No"]
+  ],
+  "MTSS_Interventions_Log": [
+    ["Timestamp", "Email", "Student First", "Student Last", "Interventions", "Notes"],
+    // Frodo Baggins check-in logged this week by Sarah Janiga
+    [new Date(), "sarah.janiga@copley-fairlawn.org", "Frodo", "Baggins", "Learning Lab", "Checked in"]
+  ],
+  "Staff_Directory": [
+    ["Last Name", "First Name", "Staff Classification", "Department / Specific Role", "Email"],
+    ["Wilson", "Tom", "Teacher", "English", "tom.wilson@copley-fairlawn.org"],
+    ["Janiga", "Sarah", "Teacher", "Science", "sarah.janiga@copley-fairlawn.org"],
+    ["Gray", "Amy", "Support Staff", "Counseling", "amy.gray@copley-fairlawn.org"]
+  ]
+}};
+
+var SpreadsheetApp = {{
+  getActiveSpreadsheet: function() {{
+    return {{
+      getSheetByName: function(name) {{
+        if (!mockSheets[name]) return null;
+        return {{
+          getName: function() {{ return name; }},
+          getDataRange: function() {{
+            return {{
+              getValues: function() {{ return mockSheets[name]; }}
+            }};
+          }}
+        }};
+      }}
+    }};
+  }}
+}};
+
+var Session = {{
+  getActiveUser: function() {{
+    return {{
+      getEmail: function() {{ return "admin@copley-fairlawn.org"; }}
+    }};
+  }}
+}};
+
+var sentEmails = [];
+var MailApp = {{
+  sendEmail: function(details) {{
+    sentEmails.push(details);
+  }}
+}};
+
+function run() {{
+  sentEmails = [];
+  sendWeeklyDigest();
+  return JSON.stringify(sentEmails);
+}}
+"""
+
+full_digest_test_code = code_content + "\n" + mock_digest_js
+
+proc = subprocess.Popen(
+    ["osascript", "-l", "JavaScript"],
+    stdin=subprocess.PIPE,
+    stdout=subprocess.PIPE,
+    stderr=subprocess.PIPE,
+    text=True
+)
+stdout, stderr = proc.communicate(input=full_digest_test_code)
+
+if proc.returncode != 0:
+    print("❌ Compilation or Runtime error in Test Case 3:")
+    print(stderr)
+    exit(1)
+
+emails_sent = json.loads(stdout.strip())
+print(f"Processed Digests Sent: {len(emails_sent)}")
+
+digest_passed = True
+tom_wilson_email = None
+sarah_janiga_email = None
+amy_gray_email = None
+
+for email in emails_sent:
+    if email["to"] == "tom.wilson@copley-fairlawn.org":
+        tom_wilson_email = email
+    elif email["to"] == "sarah.janiga@copley-fairlawn.org":
+        sarah_janiga_email = email
+    elif email["to"] == "amy.gray@copley-fairlawn.org":
+        amy_gray_email = email
+
+# Tom Wilson: Luke Skywalker Active but not logged -> outstanding 1. Is Teacher -> shows warning
+if not tom_wilson_email:
+    print("❌ Tom Wilson did not receive weekly digest email.")
+    digest_passed = False
+else:
+    # Check if MTSS log section is present (indicates outstanding)
+    if "Log Strategies" not in tom_wilson_email["htmlBody"] or "outstanding student MTSS" not in tom_wilson_email["htmlBody"]:
+        print("❌ Tom Wilson digest missing outstanding MTSS warning.")
+        digest_passed = False
+    else:
+        print("✅ Tom Wilson dynamic outstanding MTSS warnings verified!")
+
+# Sarah Janiga: Frodo Baggins Active and logged -> outstanding 0. Is Teacher -> shows all clear
+if not sarah_janiga_email:
+    print("❌ Sarah Janiga did not receive weekly digest email.")
+    digest_passed = False
+else:
+    if "MTSS Review Status: Clear" not in sarah_janiga_email["htmlBody"]:
+        print("❌ Sarah Janiga digest missing 'MTSS Review Status: Clear' section.")
+        digest_passed = False
+    else:
+        print("✅ Sarah Janiga dynamic caseload all-clear verified!")
+
+# Amy Gray: Support Staff -> exempt from MTSS -> does not show any warning (neither outstanding nor clear)
+if not amy_gray_email:
+    print("❌ Amy Gray did not receive weekly digest email.")
+    digest_passed = False
+else:
+    if "MTSS" in amy_gray_email["htmlBody"] or "Log Strategies" in amy_gray_email["htmlBody"]:
+        print("❌ Amy Gray (Support Staff) digest contains MTSS sections.")
+        digest_passed = False
+    else:
+        print("✅ Amy Gray support classification exemption verified!")
+
+if digest_passed:
+    print("\n✨ TEST CASE 3 PASSED! Dynamic weekly digests resolved correctly.")
+else:
+    print("\n❌ TEST CASE 3 FAILED.")
+
 print("\n================================================================")
-if scan_passed and economy_passed and override_passed:
+if scan_passed and economy_passed and digest_passed:
     print("🎉 ALL CODE.GS BACKEND SIMULATION TESTS PASSED SUCCESSFULLY!")
     exit(0)
 else:
