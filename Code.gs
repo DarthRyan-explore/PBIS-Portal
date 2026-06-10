@@ -131,7 +131,7 @@ function processShoutoutSubmission(values) {
     status = "Approved";
     auditedBy = "Auto-Approved (Staff)";
     auditDate = new Date();
-    featureOnTv = true;
+    featureOnTv = false; // Kept unchecked by default to prevent TV flooding!
     Logger.log("Staff-to-Student VSO detected. Recipient: " + teacher + " (" + house + ") gets " + points + " house points (Auto-Approved).");
   } else {
     // Student-to-Staff Shout-out
@@ -166,23 +166,6 @@ function processShoutoutSubmission(values) {
   ]);
   
   Logger.log("Successfully routed shout-out to Moderation Queue.");
-  
-  // For auto-approved staff submissions, trigger immediate slide sync
-  if (isStaffSender) {
-    var sysConfig = getSystemConfig();
-    var presentationId = sysConfig.SLIDES_PRESENTATION_ID;
-    var staffPresentationId = sysConfig.STAFF_SLIDES_PRESENTATION_ID || sysConfig.STAFF_TO_STUDENT_SLIDES_ID;
-    
-    if ((presentationId && presentationId !== "YOUR_SLIDES_PRESENTATION_ID_HERE" && presentationId !== "") ||
-        (staffPresentationId && staffPresentationId !== "YOUR_STAFF_SLIDES_PRESENTATION_ID_HERE" && staffPresentationId !== "")) {
-      try {
-        runSlidesSync(sysConfig);
-        Logger.log("Successfully ran auto-sync of staff shoutout to slides.");
-      } catch (err) {
-        Logger.log("Failed auto-sync staff shoutout to slides: " + err.toString());
-      }
-    }
-  }
 }
 
 /**
@@ -1038,7 +1021,7 @@ function calculateHousePoints(slips, pepOverrides) {
  * @param {number} [limit] Maximum number of shout-outs to display (default: 10).
  */
 function updateFeaturedShoutOutSlides(presentationId, limit, filterDirection) {
-  limit = limit || 10;
+  limit = 12; // Enforce a hard cap of 12 featured slides at any given time to prevent slide flooding!
   if (!presentationId || presentationId === "YOUR_SLIDES_PRESENTATION_ID_HERE") {
     Logger.log("Google Slides update skipped: No valid presentationId provided.");
     return;
@@ -1255,9 +1238,9 @@ function lookupStudentGrade(email, name) {
     }
   }
   
-  // 2. Try name lookup (if email wasn't matched)
+  // 2. Try exact name lookup
   if (name) {
-    var cleanName = name.trim().toLowerCase();
+    var cleanName = name.trim().toLowerCase().replace(/\s+/g, " ");
     for (var r = 1; r < data.length; r++) {
       var fName = firstColIdx !== -1 && data[r][firstColIdx] ? data[r][firstColIdx].toString().trim() : "";
       var lName = lastColIdx !== -1 && data[r][lastColIdx] ? data[r][lastColIdx].toString().trim() : "";
@@ -1277,7 +1260,78 @@ function lookupStudentGrade(email, name) {
     }
   }
   
-  // 3. Fallback to hardcoded list, then to Freshmen
+  // 3. Smart Name Resolver & Nickname Fallbacks
+  if (name) {
+    var cleanName = name.trim().toLowerCase().replace(/\s+/g, " ");
+    var nameParts = cleanName.split(" ");
+    
+    if (nameParts.length >= 2) {
+      var inputFirst = nameParts[0];
+      var inputLast = nameParts[nameParts.length - 1];
+      
+      // Resolve common nicknames
+      var nicknames = {
+        "izzy": ["isabella", "elizabeth"],
+        "bella": ["isabella"],
+        "abby": ["abigail"],
+        "alex": ["alexander", "alexandra", "alexis"],
+        "ben": ["benjamin"],
+        "chris": ["christopher", "christian"],
+        "dan": ["daniel"],
+        "gaby": ["gabrielle", "gabriela"],
+        "gwen": ["gwendolyn"],
+        "grey": ["gwen", "gwendolyn"],
+        "jack": ["john"],
+        "jake": ["jacob"],
+        "josh": ["joshua"],
+        "kate": ["katherine", "kaitlyn"],
+        "luke": ["lucas"],
+        "maddy": ["madeline", "madison"],
+        "matt": ["matthew"],
+        "max": ["maxwell", "maximilian"],
+        "nick": ["nicholas"],
+        "sam": ["samuel", "samantha"],
+        "will": ["william"],
+        "zach": ["zachary"]
+      };
+      
+      var firstNamesToSearch = [inputFirst];
+      if (nicknames.hasOwnProperty(inputFirst)) {
+        firstNamesToSearch = firstNamesToSearch.concat(nicknames[inputFirst]);
+      }
+      
+      for (var r = 1; r < data.length; r++) {
+        var fName = firstColIdx !== -1 && data[r][firstColIdx] ? data[r][firstColIdx].toString().trim().toLowerCase() : "";
+        var lName = lastColIdx !== -1 && data[r][lastColIdx] ? data[r][lastColIdx].toString().trim().toLowerCase() : "";
+        
+        if (lName === inputLast) {
+          for (var k = 0; k < firstNamesToSearch.length; k++) {
+            var searchName = firstNamesToSearch[k];
+            if (fName.indexOf(searchName) === 0 || searchName.indexOf(fName) === 0) {
+              Logger.log("Smart Name Lookup: Resolved '" + name + "' to '" + data[r][firstColIdx] + " " + data[r][lastColIdx] + "'");
+              return normalizeGradeToHouse(data[r][gradeColIdx]);
+            }
+          }
+        }
+      }
+      
+      // 4. Try Unique Last Name Match (Tolkien resolving to Gwen Tolkien)
+      var matchingRows = [];
+      for (var r = 1; r < data.length; r++) {
+        var lName = lastColIdx !== -1 && data[r][lastColIdx] ? data[r][lastColIdx].toString().trim().toLowerCase() : "";
+        if (lName === inputLast) {
+          matchingRows.push(r);
+        }
+      }
+      if (matchingRows.length === 1) {
+        var r = matchingRows[0];
+        Logger.log("Smart Name Lookup: Resolved unique last name '" + name + "' to '" + data[r][firstColIdx] + " " + data[r][lastColIdx] + "'");
+        return normalizeGradeToHouse(data[r][gradeColIdx]);
+      }
+    }
+  }
+  
+  // 5. Fallback to hardcoded list, then to Freshmen
   return STUDENT_HOUSE_MAPPING[name] || "Freshmen";
 }
 

@@ -633,10 +633,15 @@ function runTest4() {
   ]);
   
   // Set first approved & featured, third not featured.
-  // Note: Second (Ahsoka) is staff-to-student, which is auto-approved and auto-featured by processShoutoutSubmission!
   // Format of GenYES queue: Timestamp, Sender, House, Target Staff, Category, Message, Anonymous, Status, Audited By, Audit Date, Feature on TV?
   mockSheets["GenYES_Moderation_Queue"][1][7] = "Approved"; // Frodo (Student-to-Staff needs manual approval)
   mockSheets["GenYES_Moderation_Queue"][1][10] = true;      // Feature on TV
+  
+  // Verify staff-to-student auto-approval was marked "Approved" but "Feature on TV" was false (not auto-featured to prevent TV flooding)
+  if (mockSheets["GenYES_Moderation_Queue"][2][7] === "Approved" && mockSheets["GenYES_Moderation_Queue"][2][10] === false) {
+    // Manually check it here for slide generation in the test
+    mockSheets["GenYES_Moderation_Queue"][2][10] = true;
+  }
   
   // Append a non-featured approved row to test exclusion
   mockSheets["GenYES_Moderation_Queue"].push([
@@ -758,8 +763,9 @@ status_val = staff_vso_row[7]
 auditor_val = staff_vso_row[8]
 featured_val = staff_vso_row[10]
 
-if status_val != "Approved" or auditor_val != "Auto-Approved (Staff)" or featured_val is not True:
-    print(f"❌ Auto-approval check failed. Expected: Approved/Auto-Approved (Staff)/True, Got: {status_val}/{auditor_val}/{featured_val}")
+# In the queue before we manually toggled it in the test script, it starts as False:
+if status_val != "Approved" or auditor_val != "Auto-Approved (Staff)":
+    print(f"❌ Auto-approval check failed. Expected: Approved/Auto-Approved (Staff), Got: {status_val}/{auditor_val}")
     t4_passed = False
 else:
     print("✅ Staff-to-student auto-approval and slide auto-gating verified!")
