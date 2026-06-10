@@ -45,16 +45,29 @@ var STUDENT_HOUSE_MAPPING = {
  */
 function onFormSubmitTrigger(e) {
   try {
+    if (!e) {
+      Logger.log("onFormSubmitTrigger called manually with no event object.");
+      return;
+    }
     var range = e.range;
-    var sheet = range.getSheet();
-    var sheetName = sheet.getName();
-    var values = e.values; // Array of submission values matching columns
+    var sheet = range ? range.getSheet() : null;
+    var sheetName = sheet ? sheet.getName() : "";
+    var values = e.values || (range ? range.getValues()[0] : null);
     
-    Logger.log("Form submitted on sheet: " + sheetName);
+    Logger.log("Form submitted on sheet: '" + sheetName + "'");
     
-    // 1. Process Student Shout-Out Submission
-    if (sheetName === CONFIG.SHOUTOUT_FORM_SHEET_NAME) {
+    if (!values) {
+      Logger.log("Error: No values found in submission event.");
+      return;
+    }
+    
+    Logger.log("Submitted values: " + JSON.stringify(values));
+    
+    var expectedName = CONFIG.SHOUTOUT_FORM_SHEET_NAME;
+    if (sheetName.toLowerCase().trim() === expectedName.toLowerCase().trim()) {
       processShoutoutSubmission(values);
+    } else {
+      Logger.log("Form submit ignored: Sheet '" + sheetName + "' does not match expected '" + expectedName + "'");
     }
   } catch (error) {
     Logger.log("Error in onFormSubmitTrigger: " + error.toString());
