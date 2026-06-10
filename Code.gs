@@ -202,14 +202,22 @@ function sendWeeklyDigest() {
   // Resolve headers to find the Target Teacher column index dynamically
   var headers = shoutouts[0];
   var teacherColIdx = -1;
+  var senderColIdx = -1;
+  var msgColIdx = -1;
+  
   for (var c = 0; c < headers.length; c++) {
     var h = headers[c].toString().toLowerCase().trim();
     if (h.indexOf("staff") !== -1 || h.indexOf("teacher") !== -1) {
       teacherColIdx = c;
-      break;
+    } else if (h.indexOf("first name") !== -1 || h.indexOf("sender") !== -1 || h.indexOf("your name") !== -1) {
+      senderColIdx = c;
+    } else if (h.indexOf("message") !== -1 || h.indexOf("shoutout") !== -1 || h.indexOf("praise") !== -1) {
+      msgColIdx = c;
     }
   }
   if (teacherColIdx === -1) teacherColIdx = 4; // Default to Column E (index 4)
+  if (senderColIdx === -1) senderColIdx = 2; // Default fallback
+  if (msgColIdx === -1) msgColIdx = 6;    // Default fallback
   
   // Filter for records submitted in the last 7 days (for shoutouts received)
   var now = new Date();
@@ -225,18 +233,44 @@ function sendWeeklyDigest() {
     staffRecipients[name].received = 0;
   }
 
-  // Count weekly shout-outs
+  // Count weekly shout-outs & collect messages
+  var teacherWeeklyVSOs = {};
+  for (var staffName in staffRecipients) {
+    teacherWeeklyVSOs[staffName] = [];
+  }
+  
+  // Calculate cumulative department points
+  var deptPoints = {};
+
   for (var i = 1; i < shoutouts.length; i++) {
-    var ts = new Date(shoutouts[i][0]);
-    if (ts >= oneWeekAgo) {
-      weeklyShoutoutsCount++;
-      var receiver = shoutouts[i][teacherColIdx] ? shoutouts[i][teacherColIdx].toString().trim() : "";
+    var receiver = shoutouts[i][teacherColIdx] ? shoutouts[i][teacherColIdx].toString().trim() : "";
+    if (receiver && staffRecipients[receiver]) {
+      var dept = staffRecipients[receiver].dept || "General Staff";
+      deptPoints[dept] = (deptPoints[dept] || 0) + 10;
       
-      if (staffRecipients[receiver]) {
+      // Check if submitted in the last 7 days
+      var ts = new Date(shoutouts[i][0]);
+      if (ts >= oneWeekAgo) {
+        weeklyShoutoutsCount++;
         staffRecipients[receiver].received++;
+        
+        var sender = shoutouts[i][senderColIdx] ? shoutouts[i][senderColIdx].toString().trim() : "Anonymous";
+        var msg = shoutouts[i][msgColIdx] ? shoutouts[i][msgColIdx].toString().trim() : "";
+        var isAnon = shoutouts[i][7] && shoutouts[i][7].toString().toLowerCase().trim() === "yes";
+        if (isAnon) {
+          sender = "Anonymous";
+        }
+        teacherWeeklyVSOs[receiver].push({ sender: sender, message: msg });
       }
     }
   }
+  
+  // Sort departments by points
+  var sortedDepts = [];
+  for (var d in deptPoints) {
+    sortedDepts.push({ name: d, points: deptPoints[d] });
+  }
+  sortedDepts.sort(function(a, b) { return b.points - a.points; });
   
   // 3. Compile MTSS Logs by student name -> array of submission timestamps
   var studentLogDates = {};
@@ -326,8 +360,20 @@ function sendWeeklyDigest() {
     var outstandingList = isTeacher ? (outstandingReminders[staffName] || []) : [];
     var mtssCount = outstandingList.length;
     var activeCaseloadCount = isTeacher ? (activeCaseloadSizes[staffName] || 0) : 0;
+    var weeklyVSOs = teacherWeeklyVSOs[staffName] || [];
+    var teacherDept = stats.dept || "General Staff";
     
-    var htmlBody = compileStaffDigestHTML(staffName, stats.received, mtssCount, isTeacher, activeCaseloadCount, outstandingList);
+    var htmlBody = compileStaffDigestHTML(
+      staffName, 
+      stats.received, 
+      mtssCount, 
+      isTeacher, 
+      activeCaseloadCount, 
+      outstandingList,
+      weeklyVSOs,
+      sortedDepts,
+      teacherDept
+    );
     
     if (CONFIG.DEBUG_MODE) {
       Logger.log("[DEBUG MODE] Would send email to: " + stats.email + " with Subject: Weekly PBIS Digest (Teacher: " + isTeacher + ")");
@@ -375,7 +421,10 @@ function getPreFilledFormUrl(s, sysConfig) {
   if (lastName) params.push(entryLastName + "=" + encodeURIComponent(lastName));
   if (s.class) params.push(entryClass + "=" + encodeURIComponent(s.class));
   if (s.mod) params.push(entryMod + "=" + encodeURIComponent(s.mod));
-  if (s.trigger) params.push(entryReferral + "=" + encodeURIComponent(s.trigger));
+  
+  // Pre-fill the referral trigger. If blank/missing, default to "Unknown"
+  var triggerVal = s.trigger ? s.trigger.trim() : "Unknown";
+  params.push(entryReferral + "=" + encodeURIComponent(triggerVal));
   
   if (params.length > 0) {
     var separator = url.indexOf("?") === -1 ? "?" : "&";
@@ -387,13 +436,16 @@ function getPreFilledFormUrl(s, sysConfig) {
 /**
  * Compiles a beautifully formatted Copley High School HTML newsletter for Staff
  */
-function compileStaffDigestHTML(name, praiseCount, mtssCount, isTeacher, activeCaseloadCount, outstandingStudents) {
+function compileStaffDigestHTML(name, praiseCount, mtssCount, isTeacher, activeCaseloadCount, outstandingStudents, weeklyVSOs, sortedDepts, teacherDept) {
   isTeacher = isTeacher !== false; // Default to true if not specified
   activeCaseloadCount = activeCaseloadCount || 0;
-  var mtssSection = "";
+  praiseCount = praiseCount || 0;
+  weeklyVSOs = weeklyVSOs || [];
+  sortedDepts = sortedDepts || [];
+  teacherDept = teacherDept || "General Staff";
   
+  var mtssSection = "";
   var sysConfig = getSystemConfig();
-  var mtssFormUrl = sysConfig.MTSS_FORM_URL || "https://docs.google.com/forms/d/e/1FAIpQLSdf_staff_mtss_log_form_placeholder/viewform";
   
   if (isTeacher) {
     if (activeCaseloadCount === 0) {
@@ -405,58 +457,59 @@ function compileStaffDigestHTML(name, praiseCount, mtssCount, isTeacher, activeC
       var mtssNoCaseloadText = mtssNoCaseloads[Math.floor(Math.random() * mtssNoCaseloads.length)];
       
       mtssSection = [
-        '<div style="background-color: #f3f4f6; border: 1px solid #e5e7eb; border-radius: 12px; padding: 15px; margin-top: 20px;">',
-        '  <h3 style="color: #4b5563; margin-top: 0; font-family: sans-serif; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px;">📋 MTSS Caseload: Empty</h3>',
-        '  <p style="color: #6b7280; font-size: 13px; margin: 0; line-height: 1.5;">',
+        '<div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin-top: 25px;">',
+        '  <h3 style="color: #5e738b; margin-top: 0; font-family: Arial, sans-serif; font-size: 13px; text-transform: uppercase; letter-spacing: 1px; font-weight: bold;">📋 MTSS Caseload: Empty</h3>',
+        '  <p style="color: #36506e; font-size: 13px; margin: 0; line-height: 1.6;">',
         '    ' + mtssNoCaseloadText,
         '  </p>',
         '</div>'
       ].join('\n');
     } else if (mtssCount > 0) {
       var mtssWarnings = [
-        "Look, we all love paperwork. Okay, maybe not. But you currently have outstanding student MTSS Tier 1 strategy logs due. Let's get these documented so we can pretend we have our lives completely together.",
-        "A quick heads-up: there are outstanding MTSS Tier 1 strategy logs with your name on them. Let's get these filed before Denise has to hunt us down.",
+        "Look, we all love paperwork. Okay, maybe not. But you currently have outstanding student MTSS Tier 1 strategy logs due. Let\'s get these documented so we can pretend we have our lives completely together.",
+        "A quick heads-up: there are outstanding MTSS Tier 1 strategy logs with your name on them. Let\'s get these filed before Denise has to hunt us down.",
         "Friendly reminder (or as friendly as an automated bot can be): you have active caseload students missing their weekly MTSS log. Click below to make the red box go away.",
-        "Just a minor detail, but you've got student MTSS logs outstanding this week. Take a quick moment to log them so we can keep the records clean and tidy."
+        "Just a minor detail, but you\'ve got student MTSS logs outstanding this week. Take a quick moment to log them so we can keep the records clean and tidy."
       ];
       var mtssWarningText = mtssWarnings[Math.floor(Math.random() * mtssWarnings.length)];
       
       var studentRows = [];
       (outstandingStudents || []).forEach(function(s) {
         var preFilledUrl = getPreFilledFormUrl(s, sysConfig);
+        var triggerText = s.trigger || "Unknown";
         studentRows.push(
-          '    <li style="margin-bottom: 6px;">',
-          '      <strong>' + s.name + '</strong> — <em>' + s.class + ' (' + s.mod + ')</em>',
-          '      <a href="' + preFilledUrl + '" target="_blank" style="color: #be123c; margin-left: 10px; font-size: 11px; text-decoration: underline; font-weight: bold;">Log Intervention</a>',
+          '    <li style="margin-bottom: 10px; line-height: 1.5; color: #334155;">',
+          '      <strong style="color: #0c2346; font-size: 13px;">' + s.name + '</strong> — <em style="color: #475569; font-size: 13px;">' + s.class + ' (' + s.mod + ')</em>',
+          '      <span style="font-size: 11px; color: #64748b; display: block; margin: 2px 0 4px 0;">Referral: ' + triggerText + '</span>',
+          '      <a href="' + preFilledUrl + '" target="_blank" style="background-color: #be123c; color: #ffffff; padding: 3px 10px; text-decoration: none; border-radius: 4px; font-weight: bold; font-size: 10px; display: inline-block; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 2px;">Log Intervention</a>',
           '    </li>'
         );
       });
       
       mtssSection = [
-        '<div style="background-color: #fff1f2; border: 1px solid #fecdd3; border-radius: 12px; padding: 15px; margin-top: 20px;">',
-        '  <h3 style="color: #be123c; margin-top: 0; font-family: sans-serif; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px;">⚠️ Minor Detail (Action Required)</h3>',
-        '  <p style="color: #4b5563; font-size: 13px; margin: 5px 0; line-height: 1.5;">',
+        '<div style="background-color: #fff1f2; border: 1px solid #fecdd3; border-radius: 12px; padding: 20px; margin-top: 25px;">',
+        '  <h3 style="color: #be123c; margin-top: 0; font-family: Arial, sans-serif; font-size: 13px; text-transform: uppercase; letter-spacing: 1px; font-weight: bold;">⚠️ MTSS Strategy Logs Outstanding</h3>',
+        '  <p style="color: #4b5563; font-size: 13px; margin: 5px 0 15px 0; line-height: 1.6;">',
         '    ' + mtssWarningText,
         '  </p>',
-        '  <ul style="color: #4b5563; font-size: 13px; margin: 10px 0 10px 20px; padding: 0; line-height: 1.5; list-style-type: disc;">',
+        '  <ul style="margin: 0 0 10px 0; padding-left: 20px; line-height: 1.6; list-style-type: disc;">',
         studentRows.join('\n'),
         '  </ul>',
-        '  <a href="' + mtssFormUrl + '" target="_blank" style="background-color: #be123c; color: white; padding: 8px 15px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 11px; display: inline-block; margin-top: 8px; text-transform: uppercase; letter-spacing: 0.5px;">Log Strategies</a>',
         '</div>'
       ].join('\n');
     } else {
       var mtssClears = [
         "Look at you. Zero outstanding MTSS logs. Go buy yourself a coffee, or take an extra long deep breath. You earned it.",
         "MTSS status: clean. Zero outstanding logs. You are officially an overachiever. Keep it up.",
-        "No outstanding MTSS logs. Denise is happy, you're happy, I'm happy. Well, as happy as code can get. Have a great weekend!",
+        "No outstanding MTSS logs. Denise is happy, you\'re happy, I\'m happy. Well, as happy as code can get. Have a great weekend!",
         "Zero outstanding MTSS logs due. Seriously, teach us your secrets. Have a relaxing weekend."
       ];
       var mtssClearText = mtssClears[Math.floor(Math.random() * mtssClears.length)];
       
       mtssSection = [
-        '<div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 15px; margin-top: 20px;">',
-        '  <h3 style="color: #15803d; margin-top: 0; font-family: sans-serif; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px;">✅ MTSS Review Status: Clear</h3>',
-        '  <p style="color: #4b5563; font-size: 13px; margin: 0; line-height: 1.5;">',
+        '<div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 20px; margin-top: 25px;">',
+        '  <h3 style="color: #15803d; margin-top: 0; font-family: Arial, sans-serif; font-size: 13px; text-transform: uppercase; letter-spacing: 1px; font-weight: bold;">✅ MTSS Review Status: Clear</h3>',
+        '  <p style="color: #36506e; font-size: 13px; margin: 0; line-height: 1.6;">',
         '    ' + mtssClearText,
         '  </p>',
         '</div>'
@@ -469,10 +522,10 @@ function compileStaffDigestHTML(name, praiseCount, mtssCount, isTeacher, activeC
   if (praiseCount > 0) {
     greetings = [
       "Hey " + name + ". Look at that, you made it to Friday. And turns out, people actually noticed you doing great things this week. You received " + praiseCount + " shout-out(s)!",
-      "Well " + name + ", another week down. The good news? You've got some fan mail. " + praiseCount + " shout-out(s), to be exact.",
-      "Hey " + name + ". Grab a coffee and sit down. We compiled your weekly appreciation digest, and you actually did pretty great (+" + (praiseCount * 10) + " department points).",
-      "Hey " + name + ". Good news: you got " + praiseCount + " shout-out(s) this week. Bad news: I still don't have a coffee for you. But hey, take the win.",
-      "Well, " + name + ", you did it. You survived the week, AND you actually managed to inspire some students. You've got " + praiseCount + " shout-out(s) waiting."
+      "Well " + name + ", another week down. The good news? You\'ve got some fan mail. " + praiseCount + " shout-out(s), to be exact.",
+      "Hey " + name + ". Grab a coffee and sit down. We compiled your weekly appreciation digest, and you actually did pretty great (+" + (praiseCount * 10) + " points for the " + teacherDept + " department).",
+      "Hey " + name + ". Good news: you got " + praiseCount + " shout-out(s) this week. Bad news: I still don\'t have a coffee for you. But hey, take the win.",
+      "Well, " + name + ", you did it. You survived the week, AND you actually managed to inspire some students. You\'ve got " + praiseCount + " shout-out(s) waiting."
     ];
   } else {
     greetings = [
@@ -484,52 +537,135 @@ function compileStaffDigestHTML(name, praiseCount, mtssCount, isTeacher, activeC
   }
   var greetingText = greetings[Math.floor(Math.random() * greetings.length)];
 
+  // 1. Build weekly VSO list if they received any
+  var vsoSection = "";
+  if (weeklyVSOs.length > 0) {
+    var vsoBlocks = [];
+    weeklyVSOs.forEach(function(v) {
+      vsoBlocks.push(
+        '      <div style="margin-bottom: 14px; padding: 12px 16px; background-color: #fcfaf2; border-left: 4px solid #ffcc04; border-radius: 4px;">',
+        '        <p style="color: #36506e; font-size: 13px; font-style: italic; margin: 0 0 8px 0; line-height: 1.5;">"' + v.message + '"</p>',
+        '        <p style="color: #0c2346; font-size: 11px; font-weight: bold; margin: 0; text-align: right;">— ' + v.sender + '</p>',
+        '      </div>'
+      );
+    });
+    
+    vsoSection = [
+      '<div style="margin-top: 25px; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; background-color: #ffffff; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">',
+      '  <div style="background-color: #0c2346; padding: 12px 18px; border-bottom: 3px solid #ffcc04;">',
+      '    <h3 style="margin: 0; color: #ffffff; font-size: 13px; text-transform: uppercase; letter-spacing: 1px; font-family: Arial, sans-serif; font-weight: bold;">📩 Friday Fan Mail</h3>',
+      '  </div>',
+      '  <div style="padding: 18px; background-color: #ffffff;">',
+      vsoBlocks.join('\n'),
+      '  </div>',
+      '</div>'
+    ].join('\n');
+  }
+
+  // 2. Build running scoreboard table
+  var scoreboardRows = [];
+  (sortedDepts || []).forEach(function(dept, idx) {
+    var rank = idx + 1;
+    var rankStr = rank.toString();
+    if (rank === 1) rankStr = "🥇";
+    else if (rank === 2) rankStr = "🥈";
+    else if (rank === 3) rankStr = "🥉";
+    
+    var isTeacherDept = dept.name.toLowerCase() === teacherDept.toLowerCase();
+    var rowBg = isTeacherDept ? "background-color: #fefcbf; border-left: 4px solid #ffcc04;" : (idx % 2 === 1 ? "background-color: #f8fafc;" : "background-color: #ffffff;");
+    var rowWeight = isTeacherDept ? "font-weight: bold; color: #0c2346;" : "color: #36506e;";
+    var labelSuffix = isTeacherDept ? ' <span style="font-size: 9px; background-color: #ffcc04; color: #0c2346; padding: 1px 5px; border-radius: 3px; font-weight: bold; margin-left: 4px; text-transform: uppercase; display: inline-block; vertical-align: middle;">You</span>' : "";
+    
+    scoreboardRows.push(
+      '        <tr style="' + rowBg + '">',
+      '          <td style="padding: 8px 10px; text-align: center; ' + rowWeight + '">' + rankStr + '</td>',
+      '          <td style="padding: 8px 10px; ' + rowWeight + '">' + dept.name + labelSuffix + '</td>',
+      '          <td style="padding: 8px 10px; text-align: right; ' + rowWeight + '">' + dept.points + ' pts</td>',
+      '        </tr>'
+    );
+  });
+  
+  var scoreboardSection = "";
+  if (sortedDepts.length > 0) {
+    scoreboardSection = [
+      '<div style="margin-top: 25px; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; background-color: #ffffff; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">',
+      '  <div style="background-color: #0c2346; padding: 12px 18px; border-bottom: 3px solid #ffcc04;">',
+      '    <h3 style="margin: 0; color: #ffffff; font-size: 13px; text-transform: uppercase; letter-spacing: 1px; font-family: Arial, sans-serif; font-weight: bold;">🏆 Department Standings Scoreboard</h3>',
+      '  </div>',
+      '  <div style="padding: 15px; background-color: #ffffff;">',
+      '    <table cellpadding="0" cellspacing="0" border="0" width="100%" style="font-size: 13px; border-collapse: collapse; font-family: Arial, sans-serif;">',
+      '      <thead>',
+      '        <tr style="border-bottom: 2px solid #e2e8f0; text-align: left;">',
+      '          <th style="padding: 6px 10px; font-weight: bold; color: #0c2346; width: 15%; text-align: center;">Rank</th>',
+      '          <th style="padding: 6px 10px; font-weight: bold; color: #0c2346; width: 60%;">Department</th>',
+      '          <th style="padding: 6px 10px; font-weight: bold; color: #0c2346; width: 25%; text-align: right;">Total Points</th>',
+      '        </tr>',
+      '      </thead>',
+      '      <tbody>',
+      scoreboardRows.join('\n'),
+      '      </tbody>',
+      '    </table>',
+      '  </div>',
+      '</div>'
+    ].join('\n');
+  }
+
   var html = [
-    '<div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);">',
-    '  <!-- Header Banner -->',
-    '  <div style="background-color: #0c2346; color: #ffcc04; padding: 25px; text-align: center; border-bottom: 4px solid #ffcc04;">',
-    '    <h1 style="margin: 0; font-size: 20px; text-transform: uppercase; letter-spacing: 1px; font-weight: 900;">Copley High School</h1>',
-    '    <p style="margin: 5px 0 0 0; font-size: 11px; text-transform: uppercase; letter-spacing: 2px; font-weight: bold; opacity: 0.9;">Weekly PBIS Staff Report</p>',
-    '  </div>',
-    '  ',
-    '  <!-- Body -->',
-    '  <div style="padding: 24px; background-color: #fafbfc;">',
-    '    <p style="color: #1f2937; font-size: 14px; margin-top: 0; font-weight: bold;">',
-    '      ' + greetingText,
-    '    </p>',
-    '    <p style="color: #4b5563; font-size: 13px; line-height: 1.6;">',
-    '      Here is your weekly summary of the Virtual Shout-Outs (VSOs) and points logged. Students who sent or received a shout-out are eligible to spin the PBIS prize wheel in the commons today (Friday) for some glorious rewards.',
-    '    </p>',
+    '<div style="background-color: #eef2f6; padding: 30px 10px; font-family: Arial, Helvetica, sans-serif;">',
+    '  <div style="max-width: 650px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 12px rgba(12,35,70,0.05); background-color: #ffffff;">',
+    '    <!-- Header Banner -->',
+    '    <div style="background-color: #0c2346; color: #ffcc04; padding: 35px 20px; text-align: center; border-bottom: 6px solid #ffcc04;">',
+    '      <img src="https://drive.google.com/thumbnail?id=1pr32bbjfLZpyOCN1awAzcYvQzRS1iglj&sz=w200" alt="Copley Logo" style="display: block; margin: 0 auto 12px auto; height: 75px; width: auto;" />',
+    '      <h1 style="margin: 0; font-size: 24px; text-transform: uppercase; letter-spacing: 1px; font-weight: 800; color: #ffffff;">Copley High School</h1>',
+    '      <p style="margin: 6px 0 0 0; font-size: 13px; text-transform: uppercase; letter-spacing: 2px; font-weight: bold; color: #ffcc04;">Weekly PBIS Staff Report</p>',
+    '    </div>',
     '    ',
-    '    <!-- Stats Card Grid -->',
-    '    <div style="display: flex; gap: 15px; margin-top: 20px;">',
-    '      <div style="flex: 1; background-color: white; border: 1px solid #e5e7eb; border-radius: 12px; padding: 15px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">',
-    '        <span style="font-size: 24px; display: block; margin-bottom: 5px;">✉️</span>',
-    '        <span style="font-size: 20px; font-weight: 900; color: #0c2346; display: block;">' + praiseCount + '</span>',
-    '        <span style="font-size: 9px; text-transform: uppercase; color: #9ca3af; font-weight: bold; display: block; margin-top: 3px;">Shout-Outs Received</span>',
-    '      </div>',
-    '      <div style="flex: 1; background-color: white; border: 1px solid #e5e7eb; border-radius: 12px; padding: 15px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">',
-    '        <span style="font-size: 24px; display: block; margin-bottom: 5px;">⚡</span>',
-    '        <span style="font-size: 20px; font-weight: 900; color: #ffcc04; display: block;">+' + (praiseCount * 10) + '</span>',
-    '        <span style="font-size: 9px; text-transform: uppercase; color: #9ca3af; font-weight: bold; display: block; margin-top: 3px;">Dept Points Earned</span>',
+    '    <!-- Body -->',
+    '    <div style="padding: 30px 25px; background-color: #ffffff;">',
+    '      <p style="color: #1e293b; font-size: 15px; margin-top: 0; font-weight: bold; line-height: 1.5;">',
+    '        ' + greetingText,
+    '      </p>',
+    '      <p style="color: #475569; font-size: 13px; line-height: 1.6;">',
+    '        Here is your weekly summary of the Virtual Shout-Outs (VSOs) and points logged. Students who sent or received a shout-out are eligible to spin the PBIS prize wheel in the commons today (Friday) for some glorious rewards.',
+    '      </p>',
+    '      ',
+    '      <!-- Stats Card Grid -->',
+    '      <table cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-top: 20px; font-family: Arial, sans-serif;">',
+    '        <tr>',
+    '          <td width="48%" style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; text-align: center;">',
+    '            <span style="font-size: 28px; display: block; margin-bottom: 8px;">✉️</span>',
+    '            <span style="font-size: 24px; font-weight: 800; color: #0c2346; display: block;">' + praiseCount + '</span>',
+    '            <span style="font-size: 10px; text-transform: uppercase; color: #64748b; font-weight: bold; display: block; margin-top: 4px; letter-spacing: 0.5px;">Shout-Outs Received</span>',
+    '          </td>',
+    '          <td width="4%">&nbsp;</td>',
+    '          <td width="48%" style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; text-align: center;">',
+    '            <span style="font-size: 28px; display: block; margin-bottom: 8px;">⚡</span>',
+    '            <span style="font-size: 24px; font-weight: 800; color: #36506e; display: block;">+' + (praiseCount * 10) + '</span>',
+    '            <span style="font-size: 10px; text-transform: uppercase; color: #64748b; font-weight: bold; display: block; margin-top: 4px; letter-spacing: 0.5px;">For ' + teacherDept + ' Dept</span>',
+    '          </td>',
+    '        </tr>',
+    '      </table>',
+    '      ',
+    '      ' + vsoSection,
+    '      ',
+    '      ' + mtssSection,
+    '      ',
+    '      ' + scoreboardSection,
+    '      ',
+    '      <div style="margin-top: 35px; border-top: 1px solid #e2e8f0; padding-top: 25px; text-align: center;">',
+    '        <a href="https://github.com/DarthRyan-explore/PBIS-Portal" target="_blank" style="background-color: #0c2346; color: #ffcc04; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 11px; text-transform: uppercase; display: inline-block; border: 2px solid #ffcc04; letter-spacing: 0.5px;">View Public Scoreboard</a>',
     '      </div>',
     '    </div>',
     '    ',
-    '    ' + mtssSection,
-    '    ',
-    '    <div style="margin-top: 25px; border-top: 1px solid #e5e7eb; padding-top: 20px; text-align: center;">',
-    '      <a href="https://github.com/DarthRyan-explore/PBIS-Portal" target="_blank" style="background-color: #0c2346; color: #ffcc04; padding: 10px 20px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 11px; text-transform: uppercase; display: inline-block; border: 1px solid #ffcc04/20; letter-spacing: 0.5px;">View Public Scoreboard</a>',
+    '    <!-- Footer -->',
+    '    <div style="background-color: #f8fafc; color: #64748b; font-size: 10px; text-align: center; padding: 20px; border-top: 1px solid #e2e8f0; line-height: 1.5;">',
+    '      © 2026 Copley-Fairlawn City School District. All rights reserved.<br>',
+    '      CONFIDENTIAL: Internal staff report protected under school board policy.',
     '    </div>',
-    '  </div>',
-    '  ',
-    '  <!-- Footer -->',
-    '  <div style="background-color: #f3f4f6; color: #9ca3af; font-size: 10px; text-align: center; padding: 15px; border-top: 1px solid #e5e7eb;">',
-    '    © 2026 Copley-Fairlawn City School District. All rights reserved.<br>',
-    '    CONFIDENTIAL: Internal staff report protected under school board policy.',
     '  </div>',
     '</div>'
   ].join('\n');
-  
+
   return html;
 }
 
@@ -1093,10 +1229,34 @@ function sendTestDigestToMe() {
   Logger.log("Compiling mock digest for testing...");
   
   var mockStudents = [
-    { name: "Luke Skywalker", class: "English 11", mod: "Mod 14-15" },
-    { name: "Frodo Baggins", class: "Biology", mod: "Mod 10-11" }
+    { name: "Luke Skywalker", class: "English 11", mod: "Mod 14-15", trigger: "Academic Concern" },
+    { name: "Frodo Baggins", class: "Biology", mod: "Mod 10-11", trigger: "Failing Class after 3 weeks" }
   ];
-  var htmlBody = compileStaffDigestHTML("Test Instructor", 3, mockStudents.length, true, 4, mockStudents);
+  
+  var mockVSOs = [
+    { sender: "Luke Skywalker", message: "Thank you for taking extra time to help me understand the essay format after mod 14! You\'re the best!" },
+    { sender: "Anonymous Student", message: "Thanks for making science class so fun and engaging every day!" }
+  ];
+  
+  var mockDepts = [
+    { name: "English", points: 140 },
+    { name: "Science", points: 110 },
+    { name: "Math", points: 90 },
+    { name: "Soc Studies", points: 80 },
+    { name: "Art & Music", points: 60 }
+  ];
+  
+  var htmlBody = compileStaffDigestHTML(
+    "Test Instructor", 
+    2, // praiseCount
+    mockStudents.length, 
+    true, // isTeacher
+    4, // activeCaseloadCount
+    mockStudents, 
+    mockVSOs, 
+    mockDepts, 
+    "English" // teacherDept
+  );
   
   MailApp.sendEmail({
     to: myEmail,
@@ -1107,5 +1267,8 @@ function sendTestDigestToMe() {
   
   Logger.log("Test digest email successfully sent to " + myEmail);
 }
+
+
+
 
 

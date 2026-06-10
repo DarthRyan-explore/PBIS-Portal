@@ -446,7 +446,7 @@ if not tom_wilson_email:
     digest_passed = False
 else:
     # Check if MTSS log section is present (indicates outstanding)
-    if "Log Strategies" not in tom_wilson_email["htmlBody"] or "Minor Detail" not in tom_wilson_email["htmlBody"]:
+    if "Log Intervention" not in tom_wilson_email["htmlBody"] or "MTSS Strategy Logs Outstanding" not in tom_wilson_email["htmlBody"]:
         print("❌ Tom Wilson digest missing outstanding MTSS warning.")
         digest_passed = False
     else:
@@ -468,7 +468,7 @@ if not amy_gray_email:
     print("❌ Amy Gray did not receive weekly digest email.")
     digest_passed = False
 else:
-    if "MTSS" in amy_gray_email["htmlBody"] or "Log Strategies" in amy_gray_email["htmlBody"]:
+    if "MTSS" in amy_gray_email["htmlBody"] or "Log Intervention" in amy_gray_email["htmlBody"]:
         print("❌ Amy Gray (Support Staff) digest contains MTSS sections.")
         digest_passed = False
     else:
