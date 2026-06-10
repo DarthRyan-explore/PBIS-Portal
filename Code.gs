@@ -610,17 +610,14 @@ function compileStaffDigestHTML(name, praiseCount, mtssCount, isTeacher, activeC
     ].join('\n');
   }
 
-  var destinationUrl = "";
-  var buttonText = "View PBIS Admin Sheet";
+  var actionButtonHtml = "";
   if (sysConfig.SLIDES_PRESENTATION_ID && sysConfig.SLIDES_PRESENTATION_ID !== "YOUR_SLIDES_PRESENTATION_ID_HERE" && sysConfig.SLIDES_PRESENTATION_ID !== "") {
-    destinationUrl = "https://docs.google.com/presentation/d/" + sysConfig.SLIDES_PRESENTATION_ID + "/present";
-    buttonText = "View Hallway TV Slideshow Loop";
-  } else {
-    try {
-      destinationUrl = SpreadsheetApp.getActiveSpreadsheet().getUrl();
-    } catch(e) {
-      destinationUrl = "#";
-    }
+    var slidesUrl = "https://docs.google.com/presentation/d/" + sysConfig.SLIDES_PRESENTATION_ID + "/present";
+    actionButtonHtml = [
+      '      <div style="margin-top: 35px; border-top: 1px solid #e2e8f0; padding-top: 25px; text-align: center;">',
+      '        <a href="' + slidesUrl + '" target="_blank" style="background-color: #0c2346; color: #ffcc04; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 11px; text-transform: uppercase; display: inline-block; border: 2px solid #ffcc04; letter-spacing: 0.5px;">View Hallway TV Slideshow Loop</a>',
+      '      </div>'
+    ].join('\n');
   }
 
   var html = [
@@ -628,7 +625,7 @@ function compileStaffDigestHTML(name, praiseCount, mtssCount, isTeacher, activeC
     '  <div style="max-width: 650px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 12px rgba(12,35,70,0.05); background-color: #ffffff;">',
     '    <!-- Header Banner -->',
     '    <div style="background-color: #0c2346; text-align: center; border-bottom: 6px solid #ffcc04; overflow: hidden; padding: 0;">',
-    '      <img src="https://raw.githubusercontent.com/DarthRyan-explore/PBIS-Portal/google-workspace-pivot/assets/copley_pbis_banner.png" alt="Copley High School Weekly PBIS Staff Report" style="display: block; width: 100%; height: auto; max-width: 650px; margin: 0 auto;" />',
+    '      <img src="https://raw.githubusercontent.com/DarthRyan-explore/PBIS-Portal/google-workspace-pivot/assets/copley_pbis_banner.png?v=3" alt="Copley High School Weekly PBIS Staff Report" style="display: block; width: 100%; height: auto; max-width: 650px; margin: 0 auto;" />',
     '    </div>',
     '    ',
     '    <!-- Body -->',
@@ -663,9 +660,7 @@ function compileStaffDigestHTML(name, praiseCount, mtssCount, isTeacher, activeC
     '      ',
     '      ' + scoreboardSection,
     '      ',
-    '      <div style="margin-top: 35px; border-top: 1px solid #e2e8f0; padding-top: 25px; text-align: center;">',
-    '        <a href="' + destinationUrl + '" target="_blank" style="background-color: #0c2346; color: #ffcc04; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 11px; text-transform: uppercase; display: inline-block; border: 2px solid #ffcc04; letter-spacing: 0.5px;">' + buttonText + '</a>',
-    '      </div>',
+    actionButtonHtml,
     '    </div>',
     '    ',
     '    <!-- Footer -->',
@@ -987,12 +982,31 @@ function updateFeaturedShoutOutSlides(presentationId, limit) {
     }
 
     var data = modSheet.getDataRange().getValues();
+    var headers = data[0];
+    
+    // Dynamically find "Feature on TV" column
+    var featureColIdx = -1;
+    for (var c = 0; c < headers.length; c++) {
+      var hName = headers[c].toString().toLowerCase().trim();
+      if (hName.indexOf("feature") !== -1 || hName.indexOf("tv") !== -1) {
+        featureColIdx = c;
+        break;
+      }
+    }
+    
     var approvedShoutouts = [];
 
     // Columns: [0] Timestamp, [1] Sender, [2] House, [3] Target Staff, [4] Category, [5] Message, [6] Anonymous, [7] Status
     for (var i = data.length - 1; i >= 1; i--) {
       var status = data[i][7] ? data[i][7].toString().trim() : "";
-      if (status.toLowerCase() === "approved") {
+      
+      var isFeatured = true;
+      if (featureColIdx !== -1) {
+        var featVal = data[i][featureColIdx] ? data[i][featureColIdx].toString().trim().toLowerCase() : "";
+        isFeatured = (featVal === "yes" || featVal === "true" || featVal === "1" || data[i][featureColIdx] === true);
+      }
+      
+      if (status.toLowerCase() === "approved" && isFeatured) {
         var isAnonymous = data[i][6] && data[i][6].toString().toLowerCase() === "yes";
         approvedShoutouts.push({
           sender: isAnonymous ? "Anonymous Copley Indian" : (data[i][1] || "Anonymous"),
@@ -1445,13 +1459,35 @@ function onEditTrigger(e) {
     return;
   }
   
+  var data = sheet.getDataRange().getValues();
+  var headers = data[0];
+  var statusColIdx = -1;
+  var featureColIdx = -1;
+  
+  for (var c = 0; c < headers.length; c++) {
+    var hName = headers[c].toString().toLowerCase().trim();
+    if (hName.indexOf("status") !== -1) {
+      statusColIdx = c;
+    } else if (hName.indexOf("feature") !== -1 || hName.indexOf("tv") !== -1) {
+      featureColIdx = c;
+    }
+  }
+  
+  if (statusColIdx === -1) statusColIdx = 7; // Column 8 fallback
+  
+  var statusCol = statusColIdx + 1;
+  var featureCol = featureColIdx !== -1 ? featureColIdx + 1 : -1;
+  
   var startRow = range.getRow();
   var endRow = range.getLastRow();
   var startCol = range.getColumn();
   var endCol = range.getLastColumn();
   
-  // Status column is column 8 (Column H)
-  if (startCol <= 8 && endCol >= 8) {
+  // Detect if edited range overlaps status or feature columns
+  var isStatusEdited = (startCol <= statusCol && endCol >= statusCol);
+  var isFeatureEdited = (featureCol !== -1 && startCol <= featureCol && endCol >= featureCol);
+  
+  if (isStatusEdited || isFeatureEdited) {
     var runSync = false;
     var auditUser = "Unknown Operator";
     try {
@@ -1464,17 +1500,40 @@ function onEditTrigger(e) {
     for (var r = startRow; r <= endRow; r++) {
       if (r === 1) continue; // Skip header row
       
-      // Read the current status in column 8
-      var val = sheet.getRange(r, 8).getValue().toString().trim();
-      var valLower = val.toLowerCase();
+      var isApproved = false;
       
-      if (valLower === "approved" || valLower === "rejected") {
-        // Set Audited By in Column 9 (Col I)
-        sheet.getRange(r, 9).setValue(auditUser);
-        // Set Audit Date in Column 10 (Col J)
-        sheet.getRange(r, 10).setValue(auditDate);
+      if (isStatusEdited) {
+        var statusVal = sheet.getRange(r, statusCol).getValue().toString().trim();
+        var statusValLower = statusVal.toLowerCase();
         
-        if (valLower === "approved") {
+        if (statusValLower === "approved" || statusValLower === "rejected") {
+          // Set Audited By in Column 9 (Col I)
+          sheet.getRange(r, 9).setValue(auditUser);
+          // Set Audit Date in Column 10 (Col J)
+          sheet.getRange(r, 10).setValue(auditDate);
+          
+          if (statusValLower === "approved") {
+            isApproved = true;
+          }
+        }
+      } else {
+        // Status was not edited, check if it was already approved
+        var currentStatus = sheet.getRange(r, statusCol).getValue().toString().trim().toLowerCase();
+        if (currentStatus === "approved") {
+          isApproved = true;
+        }
+      }
+      
+      if (isApproved) {
+        // Verify Feature on TV is checked
+        if (featureCol !== -1) {
+          var featVal = sheet.getRange(r, featureCol).getValue().toString().trim().toLowerCase();
+          var isFeatured = (featVal === "yes" || featVal === "true" || featVal === "1" || sheet.getRange(r, featureCol).getValue() === true);
+          if (isFeatured) {
+            runSync = true;
+          }
+        } else {
+          // No Feature on TV column, default to sync all approved
           runSync = true;
         }
       }
