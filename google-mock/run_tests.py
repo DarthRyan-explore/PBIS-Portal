@@ -349,7 +349,8 @@ var mockSheets = {{
   "_System_Config": [
     ["Setting Name", "Value"],
     ["DENISE_FOLDER_ID", "dummy-folder-id"],
-    ["MTSS_FORM_URL", "https://docs.google.com/forms/d/e/1FAIpQLSdf_staff_mtss_log_form_placeholder/viewform"]
+    ["MTSS_FORM_URL", "https://docs.google.com/forms/d/e/1FAIpQLSdf_staff_mtss_log_form_placeholder/viewform"],
+    ["SLIDES_PRESENTATION_ID", "mock-slides-id-12345"]
   ],
   "Form Responses 1": [
     ["Timestamp", "Email", "First Name", "Last Name", "Target Teacher", "Category", "Message", "Anonymous"],
@@ -371,6 +372,7 @@ var mockSheets = {{
 var SpreadsheetApp = {{
   getActiveSpreadsheet: function() {{
     return {{
+      getUrl: function() {{ return "https://docs.google.com/spreadsheets/d/mock-sheet-id/edit"; }},
       getSheetByName: function(name) {{
         if (!mockSheets[name]) return null;
         return {{
@@ -451,6 +453,13 @@ else:
         digest_passed = False
     else:
         print("✅ Tom Wilson dynamic outstanding MTSS warnings verified!")
+    
+    # Check if the dynamic button links to Google Slides (since SLIDES_PRESENTATION_ID is set in _System_Config)
+    if "https://docs.google.com/presentation/d/mock-slides-id-12345/present" not in tom_wilson_email["htmlBody"] or "View Hallway TV Slideshow Loop" not in tom_wilson_email["htmlBody"]:
+        print("❌ Tom Wilson digest missing correct dynamic Slides link button.")
+        digest_passed = False
+    else:
+        print("✅ Tom Wilson dynamic Slides link button verified!")
 
 # Sarah Janiga: Frodo Baggins Active and logged -> outstanding 0. Is Teacher -> shows all clear
 if not sarah_janiga_email:

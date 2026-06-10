@@ -610,6 +610,19 @@ function compileStaffDigestHTML(name, praiseCount, mtssCount, isTeacher, activeC
     ].join('\n');
   }
 
+  var destinationUrl = "";
+  var buttonText = "View PBIS Admin Sheet";
+  if (sysConfig.SLIDES_PRESENTATION_ID && sysConfig.SLIDES_PRESENTATION_ID !== "YOUR_SLIDES_PRESENTATION_ID_HERE" && sysConfig.SLIDES_PRESENTATION_ID !== "") {
+    destinationUrl = "https://docs.google.com/presentation/d/" + sysConfig.SLIDES_PRESENTATION_ID + "/present";
+    buttonText = "View Hallway TV Slideshow Loop";
+  } else {
+    try {
+      destinationUrl = SpreadsheetApp.getActiveSpreadsheet().getUrl();
+    } catch(e) {
+      destinationUrl = "#";
+    }
+  }
+
   var html = [
     '<div style="background-color: #eef2f6; padding: 30px 10px; font-family: Arial, Helvetica, sans-serif;">',
     '  <div style="max-width: 650px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 12px rgba(12,35,70,0.05); background-color: #ffffff;">',
@@ -651,7 +664,7 @@ function compileStaffDigestHTML(name, praiseCount, mtssCount, isTeacher, activeC
     '      ' + scoreboardSection,
     '      ',
     '      <div style="margin-top: 35px; border-top: 1px solid #e2e8f0; padding-top: 25px; text-align: center;">',
-    '        <a href="https://darthryan-explore.github.io/PBIS-Portal/" target="_blank" style="background-color: #0c2346; color: #ffcc04; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 11px; text-transform: uppercase; display: inline-block; border: 2px solid #ffcc04; letter-spacing: 0.5px;">View Public Scoreboard</a>',
+    '        <a href="' + destinationUrl + '" target="_blank" style="background-color: #0c2346; color: #ffcc04; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 11px; text-transform: uppercase; display: inline-block; border: 2px solid #ffcc04; letter-spacing: 0.5px;">' + buttonText + '</a>',
     '      </div>',
     '    </div>',
     '    ',
@@ -1356,7 +1369,46 @@ function onOpen() {
   ui.createMenu("🏹 PBIS Admin")
     .addItem("Sync Hallway TV Slides", "triggerSlidesSyncManual")
     .addItem("Send Friday Staff Digests Now", "sendWeeklyDigest")
+    .addSeparator()
+    .addItem("Trigger Setup Guide / Diagnostics", "showTriggerSetupGuide")
     .addToUi();
+}
+
+/**
+ * Displays a popup dialog inside Google Sheets outlining the necessary triggers
+ * to operate the PBIS ecosystem (Option 1 - Pure Google Workspace Model).
+ */
+function showTriggerSetupGuide() {
+  var ui = SpreadsheetApp.getUi();
+  var message = [
+    "🏹 Copley High School PBIS System Setup Guide (Pure Google Workspace Model)",
+    "===========================================================",
+    "",
+    "To enable automated Friday emails and real-time hallway TV Slide updates, you must configure three triggers in this Apps Script project:",
+    "",
+    "1. Form Submit Trigger (For student shout-outs):",
+    "   - Function: onFormSubmitTrigger",
+    "   - Event Source: From spreadsheet",
+    "   - Event Type: On form submit",
+    "",
+    "2. Edit Trigger (For automatic GenYES Slides synchronization):",
+    "   - Function: onEditTrigger",
+    "   - Event Source: From spreadsheet",
+    "   - Event Type: On edit",
+    "   * (This automatically fills in 'Audited By', 'Audit Date', and syncs approved shout-outs to slides!)",
+    "",
+    "3. Weekly Timer Trigger (For Friday digest emails):",
+    "   - Function: sendWeeklyDigest",
+    "   - Event Source: Time-driven",
+    "   - Type: Weekly timer (Every Friday, 3:00 PM to 4:00 PM)",
+    "",
+    "===========================================================",
+    "Note: To configure these triggers, click the clock icon (Triggers) in the left panel of this editor, click '+ Add Trigger', and select the settings above.",
+    "",
+    "DEBUG MODE Status: " + (CONFIG.DEBUG_MODE ? "ACTIVE (Emails are simulated in logs)" : "OFF (Live emails will be sent)")
+  ].join("\n");
+  
+  ui.alert("PBIS Admin Trigger Setup Guide", message, ui.ButtonSet.OK);
 }
 
 /**
@@ -1374,6 +1426,74 @@ function triggerSlidesSyncManual() {
   SpreadsheetApp.getActiveSpreadsheet().toast("Starting Google Slides signage update...", "Slides Sync", 3);
   updateFeaturedShoutOutSlides(presentationId, 15);
   SpreadsheetApp.getActiveSpreadsheet().toast("Google Slides signage sync complete!", "Slides Sync", 5);
+}
+
+/**
+ * Installable Trigger function for Spreadsheet edits.
+ * Automatically handles recording GenYES audit metadata and syncing to Google Slides.
+ * 
+ * @param {Object} e The Apps Script Edit event object.
+ */
+function onEditTrigger(e) {
+  if (!e) return;
+  var range = e.range;
+  var sheet = range.getSheet();
+  var sheetName = sheet.getName();
+  
+  // Only process edits on the GenYES Moderation Queue sheet
+  if (sheetName !== CONFIG.MODERATION_SHEET_NAME) {
+    return;
+  }
+  
+  var startRow = range.getRow();
+  var endRow = range.getLastRow();
+  var startCol = range.getColumn();
+  var endCol = range.getLastColumn();
+  
+  // Status column is column 8 (Column H)
+  if (startCol <= 8 && endCol >= 8) {
+    var runSync = false;
+    var auditUser = "Unknown Operator";
+    try {
+      auditUser = Session.getActiveUser().getEmail() || "GenYES Operator";
+    } catch(err) {
+      auditUser = "GenYES Operator";
+    }
+    var auditDate = new Date();
+    
+    for (var r = startRow; r <= endRow; r++) {
+      if (r === 1) continue; // Skip header row
+      
+      // Read the current status in column 8
+      var val = sheet.getRange(r, 8).getValue().toString().trim();
+      var valLower = val.toLowerCase();
+      
+      if (valLower === "approved" || valLower === "rejected") {
+        // Set Audited By in Column 9 (Col I)
+        sheet.getRange(r, 9).setValue(auditUser);
+        // Set Audit Date in Column 10 (Col J)
+        sheet.getRange(r, 10).setValue(auditDate);
+        
+        if (valLower === "approved") {
+          runSync = true;
+        }
+      }
+    }
+    
+    if (runSync) {
+      var sysConfig = getSystemConfig();
+      var presentationId = sysConfig.SLIDES_PRESENTATION_ID;
+      if (presentationId && presentationId !== "YOUR_SLIDES_PRESENTATION_ID_HERE" && presentationId !== "") {
+        try {
+          sheet.getParent().toast("Syncing approved shout-outs to Google Slides...", "Slides Sync", 3);
+          updateFeaturedShoutOutSlides(presentationId, 15);
+          sheet.getParent().toast("Google Slides signage sync complete!", "Slides Sync", 5);
+        } catch(err) {
+          Logger.log("Failed automatic Slides sync: " + err.toString());
+        }
+      }
+    }
+  }
 }
 
 
