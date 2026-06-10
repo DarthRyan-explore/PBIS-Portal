@@ -527,6 +527,12 @@ var mockSheets = {
   "_System_Config": [
     ["Setting Name", "Value"],
     ["SLIDES_PRESENTATION_ID", "mock-deck-id"]
+  ],
+  "Form Responses 1": [
+    ["Timestamp", "Email Address", "First Name", "Last Name", "Which staff member/teacher are you shouting out?", "Category", "Appreciation Message", "Anonymous"]
+  ],
+  "Form Responses 2": [
+    ["Timestamp", "Email Address", "First Name", "Last Name", "Which student are you shouting out?", "Category", "Quick Pick", "Write-in"]
   ]
 };
 

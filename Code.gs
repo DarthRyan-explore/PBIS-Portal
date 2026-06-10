@@ -71,9 +71,9 @@ function onFormSubmitTrigger(e) {
     var sheetNameLower = sheetName.toLowerCase().trim();
     
     if (sheetNameLower === studentFormSheet.toLowerCase().trim()) {
-      processShoutoutSubmission(values, false);
+      processShoutoutSubmission(values, false, sheet);
     } else if (sheetNameLower === staffFormSheet.toLowerCase().trim()) {
-      processShoutoutSubmission(values, true);
+      processShoutoutSubmission(values, true, sheet);
     } else {
       Logger.log("Form submit ignored: Sheet '" + sheetName + "' does not match expected student sheet '" + studentFormSheet + "' or staff sheet '" + staffFormSheet + "'");
     }
@@ -85,34 +85,100 @@ function onFormSubmitTrigger(e) {
 /**
  * Processes shout-out inputs, updates house points, and routes to Moderation Queue
  */
-function processShoutoutSubmission(values, isStaffForm) {
+function processShoutoutSubmission(values, isStaffForm, sheet) {
   isStaffForm = isStaffForm === true;
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   
-  // Columns mapping:
-  // [0] Timestamp, [1] Email Address (Collected verified email)
-  // [2] First Name, [3] Last Name, [4] Target Name
-  // For Student form: [5] Category, [6] Message, [7] Anonymous (Yes/No)
-  // For Staff form: [5] Category, [6] Quick Pick, [7] Write-in
+  // Resolve sheet and headers dynamically if possible
+  if (!sheet) {
+    var sheetName = isStaffForm ? (CONFIG.STAFF_FORM_SHEET_NAME || "Form Responses 2") : (CONFIG.SHOUTOUT_FORM_SHEET_NAME || "Form Responses 1");
+    sheet = ss.getSheetByName(sheetName);
+  }
+  
+  var headers = [];
+  if (sheet) {
+    try {
+      headers = sheet.getDataRange().getValues()[0];
+    } catch(err) {
+      if (typeof Logger !== 'undefined') {
+        Logger.log("Could not read headers: " + err.toString());
+      }
+    }
+  }
+  
+  // Dynamic header offsets matching with fallbacks
+  var emailIdx = 1;
+  var firstIdx = 2;
+  var lastIdx = 3;
+  var targetIdx = 4;
+  var categoryIdx = 5;
+  var anonymousIdx = 7;
+  var quickPickIdx = isStaffForm ? 6 : -1;
+  var writeInIdx = isStaffForm ? 7 : -1;
+  var messageIdx = isStaffForm ? -1 : 6;
+  var nameIdx = -1;
+  
+  if (headers && headers.length > 0) {
+    for (var c = 0; c < headers.length; c++) {
+      var h = headers[c] ? headers[c].toString().toLowerCase().trim() : "";
+      if (h.indexOf("email") !== -1) {
+        emailIdx = c;
+      } else if (h.indexOf("first") !== -1) {
+        firstIdx = c;
+      } else if (h.indexOf("last") !== -1) {
+        lastIdx = c;
+      } else if (h.indexOf("quick") !== -1) {
+        quickPickIdx = c;
+      } else if (h.indexOf("write") !== -1) {
+        writeInIdx = c;
+      } else if (h.indexOf("category") !== -1) {
+        categoryIdx = c;
+      } else if (h.indexOf("anonymous") !== -1) {
+        anonymousIdx = c;
+      } else if (h.indexOf("message") !== -1 || h.indexOf("appreciate") !== -1) {
+        messageIdx = c;
+      } else if (isStaffForm && h.indexOf("student") !== -1) {
+        targetIdx = c;
+      } else if (!isStaffForm && (h.indexOf("teacher") !== -1 || h.indexOf("staff") !== -1 || h.indexOf("member") !== -1)) {
+        targetIdx = c;
+      } else if (h.indexOf("name") !== -1) {
+        nameIdx = c;
+      }
+    }
+  }
+  
   var timestamp = values[0];
-  var email = values[1] || "";
-  var firstName = (values[2] || "").toString().trim();
-  var lastName = (values[3] || "").toString().trim();
-  var sender = (firstName + " " + lastName).trim() || (isStaffForm ? "Anonymous Staff" : "Anonymous Student");
-  var teacher = values[4] || ""; // Target Student (for staff form) or target Staff (for student form)
-  var category = values[5] || "";
+  var email = (emailIdx !== -1 && values[emailIdx]) ? values[emailIdx].toString().trim() : "";
+  
+  // Resolve sender name dynamically (splits vs single field)
+  var sender = "";
+  if (firstIdx !== -1 && values[firstIdx] && lastIdx !== -1 && values[lastIdx]) {
+    var firstName = values[firstIdx].toString().trim();
+    var lastName = values[lastIdx].toString().trim();
+    sender = (firstName + " " + lastName).trim();
+  } else if (nameIdx !== -1 && values[nameIdx]) {
+    sender = values[nameIdx].toString().trim();
+  } else if (firstIdx !== -1 && values[firstIdx]) {
+    sender = values[firstIdx].toString().trim();
+  }
+  if (!sender) {
+    sender = isStaffForm ? "Anonymous Staff" : "Anonymous Student";
+  }
+  
+  var teacher = (targetIdx !== -1 && values[targetIdx]) ? values[targetIdx].toString().trim() : "";
+  var category = (categoryIdx !== -1 && values[categoryIdx]) ? values[categoryIdx].toString().trim() : "";
   
   var message = "";
   var isAnonymous = false;
   
   if (isStaffForm) {
-    var quickPick = values[6] ? values[6].toString().trim() : "";
-    var writeIn = values[7] ? values[7].toString().trim() : "";
+    var quickPick = (quickPickIdx !== -1 && values[quickPickIdx]) ? values[quickPickIdx].toString().trim() : "";
+    var writeIn = (writeInIdx !== -1 && values[writeInIdx]) ? values[writeInIdx].toString().trim() : "";
     message = writeIn || quickPick || "";
     isAnonymous = false; // Staff slips are never anonymous
   } else {
-    message = values[6] || "";
-    isAnonymous = (values[7] || "").toString().toLowerCase() === "yes";
+    message = (messageIdx !== -1 && values[messageIdx]) ? values[messageIdx].toString().trim() : "";
+    isAnonymous = (anonymousIdx !== -1 && values[anonymousIdx]) ? values[anonymousIdx].toString().toLowerCase() === "yes" : false;
   }
   
   Logger.log("Processing Shout-out from " + sender + " (" + email + ") to " + teacher + " (isStaffForm=" + isStaffForm + ")");
