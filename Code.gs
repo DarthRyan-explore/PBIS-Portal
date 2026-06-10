@@ -122,10 +122,16 @@ function processShoutoutSubmission(values, isStaffForm) {
   var isStaffSender = false;
   if (email) {
     var cleanEmail = email.trim().toLowerCase();
-    for (var sName in staffDirectory) {
-      if (staffDirectory[sName].email.toLowerCase().trim() === cleanEmail) {
-        isStaffSender = true;
-        break;
+    var districtDomain = CONFIG.DISTRICT_DOMAIN || "copley-fairlawn.org";
+    var domainSuffix = "@" + districtDomain.toLowerCase().trim();
+    if (cleanEmail.endsWith(domainSuffix)) {
+      isStaffSender = true;
+    } else {
+      for (var sName in staffDirectory) {
+        if (staffDirectory[sName].email.toLowerCase().trim() === cleanEmail) {
+          isStaffSender = true;
+          break;
+        }
       }
     }
   }
@@ -1117,9 +1123,14 @@ function updateFeaturedShoutOutSlides(presentationId, limit, filterDirection) {
         
         // Determine if sender is staff
         var senderIsStaff = false;
-        var staffDirectory = getStaffDirectory();
-        if (senderName && staffDirectory.hasOwnProperty(senderName)) {
+        var auditedBy = data[i][8] ? data[i][8].toString().trim() : "";
+        if (auditedBy === "Auto-Approved (Staff)") {
           senderIsStaff = true;
+        } else {
+          var staffDirectory = getStaffDirectory();
+          if (senderName && staffDirectory.hasOwnProperty(senderName)) {
+            senderIsStaff = true;
+          }
         }
         
         var direction = senderIsStaff ? "staff_to_student" : "student_to_staff";

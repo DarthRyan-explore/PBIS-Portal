@@ -354,7 +354,7 @@ var mockSheets = {{
   ],
   "Form Responses 1": [
     ["Timestamp", "Email", "First Name", "Last Name", "Target Teacher", "Category", "Message", "Anonymous"],
-    [new Date(), "luke.s@copley-fairlawn.org", "Luke", "Skywalker", "Sarah Janiga", "GOAT VSO", "Great teacher!", "No"]
+    [new Date(), "luke.s@cfcsindians.org", "Luke", "Skywalker", "Sarah Janiga", "GOAT VSO", "Great teacher!", "No"]
   ],
   "MTSS_Interventions_Log": [
     ["Timestamp", "Email", "Student First", "Student Last", "Interventions", "Notes"],
@@ -521,8 +521,8 @@ var mockSheets = {
   ],
   "Master_Roster": [
     ["First Name", "Last Name", "Email", "Grade"],
-    ["Frodo", "Baggins", "frodo.b@copley-fairlawn.org", "Senior"],
-    ["Ahsoka", "Tano", "ahsoka.t@copley-fairlawn.org", "Junior"]
+    ["Frodo", "Baggins", "frodo.b@cfcsindians.org", "Senior"],
+    ["Ahsoka", "Tano", "ahsoka.t@cfcsindians.org", "Junior"]
   ],
   "_System_Config": [
     ["Setting Name", "Value"],
@@ -611,7 +611,7 @@ function runTest4() {
   // Test 1: Student-to-Staff submission
   processShoutoutSubmission([
     "2026-06-10 12:00:00",
-    "frodo.b@copley-fairlawn.org",
+    "frodo.b@cfcsindians.org",
     "Frodo",
     "Baggins",
     "Sarah Janiga",
@@ -635,7 +635,7 @@ function runTest4() {
   // Test 3: Spoof attempt by student on staff form (security gate test)
   processShoutoutSubmission([
     "2026-06-10 12:15:00",
-    "frodo.b@copley-fairlawn.org", // student email!
+    "frodo.b@cfcsindians.org", // student email!
     "Frodo",
     "Baggins",
     "Ahsoka Tano",
