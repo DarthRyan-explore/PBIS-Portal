@@ -303,7 +303,8 @@ function sendWeeklyDigest() {
           outstandingStudents.push({
             name: student.studentName,
             class: student.class || "Unknown Course",
-            mod: student.mod || "N/A"
+            mod: student.mod || "N/A",
+            trigger: student.trigger || "Failing Class"
           });
         }
       }
@@ -368,11 +369,13 @@ function getPreFilledFormUrl(s, sysConfig) {
   var entryLastName = sysConfig.FORM_FIELD_LAST_NAME || "entry.222222";
   var entryClass = sysConfig.FORM_FIELD_CLASS || "entry.333333";
   var entryMod = sysConfig.FORM_FIELD_MOD || "entry.444444";
+  var entryReferral = sysConfig.FORM_FIELD_REFERRAL || "entry.555555";
   
   if (firstName) params.push(entryFirstName + "=" + encodeURIComponent(firstName));
   if (lastName) params.push(entryLastName + "=" + encodeURIComponent(lastName));
   if (s.class) params.push(entryClass + "=" + encodeURIComponent(s.class));
   if (s.mod) params.push(entryMod + "=" + encodeURIComponent(s.mod));
+  if (s.trigger) params.push(entryReferral + "=" + encodeURIComponent(s.trigger));
   
   if (params.length > 0) {
     var separator = url.indexOf("?") === -1 ? "?" : "&";
