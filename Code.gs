@@ -1095,21 +1095,43 @@ function updateFeaturedShoutOutSlides(presentationId, limit, filterDirection) {
     var data = modSheet.getDataRange().getValues();
     var headers = data[0];
     
-    // Dynamically find "Feature on TV" column
+    // Resolve column indexes dynamically from headers
+    var senderColIdx = 1;
+    var targetColIdx = 3;
+    var categoryColIdx = 4;
+    var messageColIdx = 5;
+    var anonymousColIdx = 6;
+    var statusColIdx = 7;
+    var auditedByColIdx = 8;
     var featureColIdx = -1;
+    
     for (var c = 0; c < headers.length; c++) {
-      var hName = headers[c].toString().toLowerCase().trim();
-      if (hName.indexOf("feature") !== -1 || hName.indexOf("tv") !== -1) {
+      var hName = headers[c] ? headers[c].toString().toLowerCase().trim() : "";
+      if (hName === "sender" || hName === "from") {
+        senderColIdx = c;
+      } else if (hName.indexOf("target") !== -1 || hName === "to" || hName.indexOf("recipient") !== -1) {
+        targetColIdx = c;
+      } else if (hName.indexOf("category") !== -1) {
+        categoryColIdx = c;
+      } else if (hName.indexOf("message") !== -1 || hName.indexOf("shout") !== -1 || hName.indexOf("praise") !== -1) {
+        messageColIdx = c;
+      } else if (hName.indexOf("anonymous") !== -1) {
+        anonymousColIdx = c;
+      } else if (hName.indexOf("status") !== -1) {
+        statusColIdx = c;
+      } else if (hName.indexOf("audit") !== -1) {
+        if (hName.indexOf("by") !== -1 || hName.indexOf("auditor") !== -1 || hName.indexOf("operator") !== -1) {
+          auditedByColIdx = c;
+        }
+      } else if (hName.indexOf("feature") !== -1 || hName.indexOf("tv") !== -1) {
         featureColIdx = c;
-        break;
       }
     }
     
     var approvedShoutouts = [];
 
-    // Columns: [0] Timestamp, [1] Sender, [2] House, [3] Target Staff, [4] Category, [5] Message, [6] Anonymous, [7] Status
     for (var i = data.length - 1; i >= 1; i--) {
-      var status = data[i][7] ? data[i][7].toString().trim() : "";
+      var status = data[i][statusColIdx] ? data[i][statusColIdx].toString().trim() : "";
       
       var isFeatured = true;
       if (featureColIdx !== -1) {
@@ -1118,12 +1140,12 @@ function updateFeaturedShoutOutSlides(presentationId, limit, filterDirection) {
       }
       
       if (status.toLowerCase() === "approved" && isFeatured) {
-        var senderName = data[i][1] || "Anonymous";
-        var receiverName = data[i][3] || "Staff Member";
+        var senderName = data[i][senderColIdx] || "Anonymous";
+        var receiverName = data[i][targetColIdx] || "Recipient";
         
         // Determine if sender is staff
         var senderIsStaff = false;
-        var auditedBy = data[i][8] ? data[i][8].toString().trim() : "";
+        var auditedBy = data[i][auditedByColIdx] ? data[i][auditedByColIdx].toString().trim() : "";
         if (auditedBy === "Auto-Approved (Staff)") {
           senderIsStaff = true;
         } else {
@@ -1147,7 +1169,7 @@ function updateFeaturedShoutOutSlides(presentationId, limit, filterDirection) {
           studentName = receiverName; // Student is the receiver
           teacherName = senderName;   // Teacher is the sender
         } else {
-          var isAnonymous = data[i][6] && data[i][6].toString().toLowerCase() === "yes";
+          var isAnonymous = data[i][anonymousColIdx] && data[i][anonymousColIdx].toString().toLowerCase() === "yes";
           studentName = isAnonymous ? "Anonymous Copley Indian" : senderName;
           teacherName = receiverName;
         }
@@ -1155,8 +1177,8 @@ function updateFeaturedShoutOutSlides(presentationId, limit, filterDirection) {
         approvedShoutouts.push({
           student: studentName,
           teacher: teacherName,
-          category: data[i][4] || "Shout-out",
-          message: data[i][5] || "",
+          category: data[i][categoryColIdx] || "Shout-out",
+          message: data[i][messageColIdx] || "",
           direction: direction
         });
         
@@ -1736,6 +1758,8 @@ function onEditTrigger(e) {
   var headers = data[0];
   var statusColIdx = -1;
   var featureColIdx = -1;
+  var auditedByColIdx = -1;
+  var auditDateColIdx = -1;
   
   for (var c = 0; c < headers.length; c++) {
     var hName = headers[c].toString().toLowerCase().trim();
@@ -1743,10 +1767,18 @@ function onEditTrigger(e) {
       statusColIdx = c;
     } else if (hName.indexOf("feature") !== -1 || hName.indexOf("tv") !== -1) {
       featureColIdx = c;
+    } else if (hName.indexOf("audit") !== -1) {
+      if (hName.indexOf("by") !== -1 || hName.indexOf("auditor") !== -1 || hName.indexOf("operator") !== -1) {
+        auditedByColIdx = c;
+      } else if (hName.indexOf("date") !== -1 || hName.indexOf("time") !== -1) {
+        auditDateColIdx = c;
+      }
     }
   }
   
   if (statusColIdx === -1) statusColIdx = 7; // Column 8 fallback
+  if (auditedByColIdx === -1) auditedByColIdx = 8;
+  if (auditDateColIdx === -1) auditDateColIdx = 9;
   
   var statusCol = statusColIdx + 1;
   var featureCol = featureColIdx !== -1 ? featureColIdx + 1 : -1;
@@ -1778,10 +1810,10 @@ function onEditTrigger(e) {
         var statusValLower = statusVal.toLowerCase();
         
         if (statusValLower === "approved" || statusValLower === "rejected") {
-          // Set Audited By in Column 9 (Col I)
-          sheet.getRange(r, 9).setValue(auditUser);
-          // Set Audit Date in Column 10 (Col J)
-          sheet.getRange(r, 10).setValue(auditDate);
+          // Set Audited By in dynamic column
+          sheet.getRange(r, auditedByColIdx + 1).setValue(auditUser);
+          // Set Audit Date in dynamic column
+          sheet.getRange(r, auditDateColIdx + 1).setValue(auditDate);
         }
       }
     }
