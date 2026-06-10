@@ -14,7 +14,8 @@
 var CONFIG = {
   LEDGER_SHEET_NAME: "House_Cup_Totals",
   MODERATION_SHEET_NAME: "GenYES_Moderation_Queue",
-  SHOUTOUT_FORM_SHEET_NAME: "Form Responses 1", // Standard Google Forms target sheet name
+  SHOUTOUT_FORM_SHEET_NAME: "Form Responses 1", // Standard Student Google Forms target sheet name
+  STAFF_FORM_SHEET_NAME: "Form Responses 2", // Standard Staff Google Forms target sheet name
   MTSS_SHEET_NAME: "MTSS_Interventions_Log",
   CC_SHEET_NAME: "Check_Connect_Logs",
   DISTRICT_DOMAIN: "copley-fairlawn.org",
@@ -63,11 +64,18 @@ function onFormSubmitTrigger(e) {
     
     Logger.log("Submitted values: " + JSON.stringify(values));
     
-    var expectedName = CONFIG.SHOUTOUT_FORM_SHEET_NAME;
-    if (sheetName.toLowerCase().trim() === expectedName.toLowerCase().trim()) {
-      processShoutoutSubmission(values);
+    var sysConfig = getSystemConfig();
+    var studentFormSheet = CONFIG.SHOUTOUT_FORM_SHEET_NAME;
+    var staffFormSheet = sysConfig.STAFF_FORM_SHEET_NAME || CONFIG.STAFF_FORM_SHEET_NAME || "Form Responses 2";
+    
+    var sheetNameLower = sheetName.toLowerCase().trim();
+    
+    if (sheetNameLower === studentFormSheet.toLowerCase().trim()) {
+      processShoutoutSubmission(values, false);
+    } else if (sheetNameLower === staffFormSheet.toLowerCase().trim()) {
+      processShoutoutSubmission(values, true);
     } else {
-      Logger.log("Form submit ignored: Sheet '" + sheetName + "' does not match expected '" + expectedName + "'");
+      Logger.log("Form submit ignored: Sheet '" + sheetName + "' does not match expected student sheet '" + studentFormSheet + "' or staff sheet '" + staffFormSheet + "'");
     }
   } catch (error) {
     Logger.log("Error in onFormSubmitTrigger: " + error.toString());
@@ -77,22 +85,37 @@ function onFormSubmitTrigger(e) {
 /**
  * Processes shout-out inputs, updates house points, and routes to Moderation Queue
  */
-function processShoutoutSubmission(values) {
+function processShoutoutSubmission(values, isStaffForm) {
+  isStaffForm = isStaffForm === true;
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   
-  // Columns mapping adjusted for Google Form verification & Name splitting:
-  // [0] Timestamp, [1] Email Address, [2] First Name, [3] Last Name, [4] Target Staff, [5] Category, [6] Message, [7] Anonymous (Yes/No)
+  // Columns mapping:
+  // [0] Timestamp, [1] Email Address (Collected verified email)
+  // [2] First Name, [3] Last Name, [4] Target Name
+  // For Student form: [5] Category, [6] Message, [7] Anonymous (Yes/No)
+  // For Staff form: [5] Category, [6] Quick Pick, [7] Write-in
   var timestamp = values[0];
   var email = values[1] || "";
   var firstName = (values[2] || "").toString().trim();
   var lastName = (values[3] || "").toString().trim();
-  var sender = (firstName + " " + lastName).trim() || "Anonymous Student";
-  var teacher = values[4] || "";
+  var sender = (firstName + " " + lastName).trim() || (isStaffForm ? "Anonymous Staff" : "Anonymous Student");
+  var teacher = values[4] || ""; // Target Student (for staff form) or target Staff (for student form)
   var category = values[5] || "";
-  var message = values[6] || "";
-  var isAnonymous = (values[7] || "").toString().toLowerCase() === "yes";
   
-  Logger.log("Processing Shout-out from " + sender + " (" + email + ") to " + teacher);
+  var message = "";
+  var isAnonymous = false;
+  
+  if (isStaffForm) {
+    var quickPick = values[6] ? values[6].toString().trim() : "";
+    var writeIn = values[7] ? values[7].toString().trim() : "";
+    message = writeIn || quickPick || "";
+    isAnonymous = false; // Staff slips are never anonymous
+  } else {
+    message = values[6] || "";
+    isAnonymous = (values[7] || "").toString().toLowerCase() === "yes";
+  }
+  
+  Logger.log("Processing Shout-out from " + sender + " (" + email + ") to " + teacher + " (isStaffForm=" + isStaffForm + ")");
   
   // Resolve if the submitter is a staff member
   var staffDirectory = getStaffDirectory();
@@ -123,16 +146,25 @@ function processShoutoutSubmission(values) {
   var auditDate = "";
   var featureOnTv = false;
   
-  if (isStaffSender) {
-    // Staff-to-Student Praise Slip
-    // Target is a student, we resolve their house by name
-    house = lookupStudentGrade("", teacher);
-    points = 10; // Student receiver gets 10 points
-    status = "Approved";
-    auditedBy = "Auto-Approved (Staff)";
-    auditDate = new Date();
-    featureOnTv = false; // Kept unchecked by default to prevent TV flooding!
-    Logger.log("Staff-to-Student VSO detected. Recipient: " + teacher + " (" + house + ") gets " + points + " house points (Auto-Approved).");
+  if (isStaffForm) {
+    if (isStaffSender) {
+      // Valid Staff-to-Student Praise Slip
+      // Target is a student, we resolve their house by name
+      house = lookupStudentGrade("", teacher);
+      points = 10; // Student receiver gets 10 points
+      status = "Approved";
+      auditedBy = "Auto-Approved (Staff)";
+      auditDate = new Date();
+      featureOnTv = false; // Kept unchecked by default to prevent TV flooding!
+      Logger.log("Staff-to-Student VSO detected. Recipient: " + teacher + " (" + house + ") gets " + points + " house points (Auto-Approved).");
+    } else {
+      // Security warning: Student tried to spoof the staff form!
+      status = "Rejected";
+      auditedBy = "System Security (Unauthorized Student Submitter)";
+      auditDate = new Date();
+      points = 0;
+      Logger.log("SECURITY WARNING: Student " + sender + " (" + email + ") attempted to submit to the Staff Praise Form! Auto-rejected.");
+    }
   } else {
     // Student-to-Staff Shout-out
     house = lookupStudentGrade(email, sender);
@@ -140,8 +172,10 @@ function processShoutoutSubmission(values) {
     Logger.log("Student-to-Staff VSO detected. Sender: " + sender + " (" + house + ") gets " + points + " house points.");
   }
   
-  // 1. Log transaction to House Cup ledger
-  updateHouseCupLedger(ss, house, points);
+  // 1. Log transaction to House Cup ledger (only if not rejected)
+  if (points > 0) {
+    updateHouseCupLedger(ss, house, points);
+  }
   
   // 2. Append to GenYES Moderation Queue sheet
   var modSheet = ss.getSheetByName(CONFIG.MODERATION_SHEET_NAME);
@@ -210,7 +244,8 @@ function updateHouseCupLedger(ss, houseName, pointsToAdd) {
 function getSystemConfig() {
   var config = {
     DENISE_FOLDER_ID: CONFIG.DENISE_FOLDER_ID,
-    MTSS_FORM_URL: CONFIG.MTSS_FORM_URL
+    MTSS_FORM_URL: CONFIG.MTSS_FORM_URL,
+    STAFF_FORM_SHEET_NAME: CONFIG.STAFF_FORM_SHEET_NAME
   };
   
   try {

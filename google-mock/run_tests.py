@@ -618,7 +618,7 @@ function runTest4() {
     "GOAT VSO",
     "Best teacher ever!",
     "No"
-  ]);
+  ], false);
   
   // Test 2: Staff-to-Student submission (praise)
   processShoutoutSubmission([
@@ -628,13 +628,25 @@ function runTest4() {
     "Janiga",
     "Ahsoka Tano",
     "Academic Excellence",
-    "Fantastic math work!",
-    "No"
-  ]);
+    "", // quick pick
+    "Fantastic math work!" // write-in
+  ], true);
   
-  // Set first approved & featured, third not featured.
+  // Test 3: Spoof attempt by student on staff form (security gate test)
+  processShoutoutSubmission([
+    "2026-06-10 12:15:00",
+    "frodo.b@copley-fairlawn.org", // student email!
+    "Frodo",
+    "Baggins",
+    "Ahsoka Tano",
+    "Academic Excellence",
+    "", // quick pick
+    "Spoofed VSO!" // write-in
+  ], true);
+  
+  // Set first approved & featured, fourth not featured (Luke Skywalker index 4 now)
   // Format of GenYES queue: Timestamp, Sender, House, Target Staff, Category, Message, Anonymous, Status, Audited By, Audit Date, Feature on TV?
-  mockSheets["GenYES_Moderation_Queue"][1][7] = "Approved"; // Frodo (Student-to-Staff needs manual approval)
+  mockSheets["GenYES_Moderation_Queue"][1][7] = "Approved"; // Frodo (Student VSO needs manual approval)
   mockSheets["GenYES_Moderation_Queue"][1][10] = true;      // Feature on TV
   
   // Verify staff-to-student auto-approval was marked "Approved" but "Feature on TV" was false (not auto-featured to prevent TV flooding)
@@ -643,7 +655,7 @@ function runTest4() {
     mockSheets["GenYES_Moderation_Queue"][2][10] = true;
   }
   
-  // Append a non-featured approved row to test exclusion
+  // Append a non-featured approved row to test exclusion (index 4)
   mockSheets["GenYES_Moderation_Queue"].push([
     "2026-06-10 12:10:00",
     "Luke Skywalker",
@@ -769,6 +781,17 @@ if status_val != "Approved" or auditor_val != "Auto-Approved (Staff)":
     t4_passed = False
 else:
     print("✅ Staff-to-student auto-approval and slide auto-gating verified!")
+
+# 5. Spoof Rejection Verification
+spoof_vso_row = test_4_results["queue"][3]
+spoof_status = spoof_vso_row[7]
+spoof_auditor = spoof_vso_row[8]
+
+if spoof_status != "Rejected" or spoof_auditor != "System Security (Unauthorized Student Submitter)":
+    print(f"❌ Spoof rejection check failed. Expected: Rejected/System Security (Unauthorized Student Submitter), Got: {spoof_status}/{spoof_auditor}")
+    t4_passed = False
+else:
+    print("✅ Student spoofing attempt on staff form successfully blocked and logged as Rejected!")
 
 if t4_passed:
     print("\n✨ TEST CASE 4 PASSED! Routing, slide sync checkboxes, and placeholder logic are perfect.")
