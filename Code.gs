@@ -1268,6 +1268,87 @@ function sendTestDigestToMe() {
   Logger.log("Test digest email successfully sent to " + myEmail);
 }
 
+/**
+ * Compiles and returns secure, public-facing House Cup and Department standing points.
+ * Excludes student names, emails, VSO texts, or MTSS comments to ensure FERPA compliance.
+ *
+ * @returns {Object} JSON-serializable public scoreboard data.
+ */
+function getPublicScoreboardData() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  
+  // 1. Load House Cup Standings
+  var houseScores = {
+    "Seniors": 0,
+    "Juniors": 0,
+    "Sophomores": 0,
+    "Freshmen": 0
+  };
+  
+  var ledgerSheet = ss.getSheetByName(CONFIG.LEDGER_SHEET_NAME);
+  if (ledgerSheet) {
+    var ledgerData = ledgerSheet.getDataRange().getValues();
+    for (var i = 1; i < ledgerData.length; i++) {
+      var houseName = ledgerData[i][0] ? ledgerData[i][0].toString().trim() : "";
+      var points = parseFloat(ledgerData[i][1]) || 0;
+      if (houseName && houseScores.hasOwnProperty(houseName)) {
+        houseScores[houseName] = points;
+      }
+    }
+  }
+  
+  // 2. Load Department Standings
+  var staffRecipients = getStaffDirectory();
+  var deptPoints = {};
+  
+  var shoutoutSheet = ss.getSheetByName(CONFIG.SHOUTOUT_FORM_SHEET_NAME);
+  if (shoutoutSheet) {
+    var shoutouts = shoutoutSheet.getDataRange().getValues();
+    if (shoutouts.length > 1) {
+      var headers = shoutouts[0];
+      var teacherColIdx = -1;
+      for (var c = 0; c < headers.length; c++) {
+        var h = headers[c].toString().toLowerCase().trim();
+        if (h.indexOf("staff") !== -1 || h.indexOf("teacher") !== -1) {
+          teacherColIdx = c;
+          break;
+        }
+      }
+      if (teacherColIdx === -1) teacherColIdx = 4; // Column E fallback
+      
+      for (var i = 1; i < shoutouts.length; i++) {
+        var receiver = shoutouts[i][teacherColIdx] ? shoutouts[i][teacherColIdx].toString().trim() : "";
+        if (receiver && staffRecipients[receiver]) {
+          var dept = staffRecipients[receiver].dept || "General Staff";
+          deptPoints[dept] = (deptPoints[dept] || 0) + 10;
+        }
+      }
+    }
+  }
+  
+  // Sort departments by points
+  var sortedDepts = [];
+  for (var d in deptPoints) {
+    sortedDepts.push({ name: d, points: deptPoints[d] });
+  }
+  sortedDepts.sort(function(a, b) { return b.points - a.points; });
+  
+  return {
+    houses: houseScores,
+    departments: sortedDepts
+  };
+}
+
+/**
+ * Web App endpoint (REST API) serving real-time public scoreboard data.
+ * Configured in Google Sheets under Deploy > New deployment > Web app.
+ */
+function doGet(e) {
+  var data = getPublicScoreboardData();
+  var JSONString = JSON.stringify(data);
+  return ContentService.createTextOutput(JSONString).setMimeType(ContentService.MimeType.JSON);
+}
+
 
 
 
