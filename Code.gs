@@ -1347,6 +1347,35 @@ function doGet(e) {
   return ContentService.createTextOutput(JSONString).setMimeType(ContentService.MimeType.JSON);
 }
 
+/**
+ * Sheets Open Trigger. Creates a custom administrative menu toolbar item
+ * for executing slide syncs and weekly digest distributions manually.
+ */
+function onOpen() {
+  var ui = SpreadsheetApp.getUi();
+  ui.createMenu("🏹 PBIS Admin")
+    .addItem("Sync Hallway TV Slides", "triggerSlidesSyncManual")
+    .addItem("Send Friday Staff Digests Now", "sendWeeklyDigest")
+    .addToUi();
+}
+
+/**
+ * Manual trigger for slides sync. Reads presentation ID from _System_Config sheet tab.
+ */
+function triggerSlidesSyncManual() {
+  var sysConfig = getSystemConfig();
+  var presentationId = sysConfig.SLIDES_PRESENTATION_ID;
+  
+  if (!presentationId || presentationId === "YOUR_SLIDES_PRESENTATION_ID_HERE") {
+    SpreadsheetApp.getUi().alert("Error: No valid SLIDES_PRESENTATION_ID found in _System_Config sheet tab. Please configure it first.");
+    return;
+  }
+  
+  SpreadsheetApp.getActiveSpreadsheet().toast("Starting Google Slides signage update...", "Slides Sync", 3);
+  updateFeaturedShoutOutSlides(presentationId, 15);
+  SpreadsheetApp.getActiveSpreadsheet().toast("Google Slides signage sync complete!", "Slides Sync", 5);
+}
+
 
 
 
