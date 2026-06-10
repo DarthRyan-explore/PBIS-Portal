@@ -1068,11 +1068,22 @@ function updateFeaturedShoutOutSlides(presentationId, limit) {
     approvedShoutouts.forEach(function(shoutout) {
       var newSlide = deck.appendSlide(templateSlide);
       
-      // Replace placeholders in the newly created slide
+      // Replace placeholders in the newly created slide (supporting common variations)
       newSlide.replaceAllText("{{MESSAGE}}", shoutout.message);
+      newSlide.replaceAllText("{{message}}", shoutout.message);
+      
       newSlide.replaceAllText("{{TEACHER}}", shoutout.teacher);
+      newSlide.replaceAllText("{{teacher}}", shoutout.teacher);
+      newSlide.replaceAllText("{{STAFF}}", shoutout.teacher);
+      newSlide.replaceAllText("{{staff}}", shoutout.teacher);
+      
       newSlide.replaceAllText("{{SENDER}}", shoutout.sender);
+      newSlide.replaceAllText("{{sender}}", shoutout.sender);
+      newSlide.replaceAllText("{{STUDENT}}", shoutout.sender);
+      newSlide.replaceAllText("{{student}}", shoutout.sender);
+      
       newSlide.replaceAllText("{{CATEGORY}}", shoutout.category);
+      newSlide.replaceAllText("{{category}}", shoutout.category);
     });
 
     Logger.log("Successfully generated " + approvedShoutouts.length + " featured shout-out slides!");
