@@ -969,9 +969,15 @@ function updateFeaturedShoutOutSlides(presentationId, limit) {
       return;
     }
 
-    // Use the first slide or second slide as the template
-    // We assume the first slide is the Title/Intro, and the second slide is the Shout-out Template
-    var templateSlide = slides.length > 1 ? slides[1] : slides[0];
+    // Determine the template slide index (0 if no Title/Intro slide, 1 if Title slide is present)
+    var sysConfig = getSystemConfig();
+    var templateIndex = 1;
+    if (sysConfig.SLIDES_TEMPLATE_INDEX !== undefined && sysConfig.SLIDES_TEMPLATE_INDEX !== "") {
+      templateIndex = parseInt(sysConfig.SLIDES_TEMPLATE_INDEX);
+    } else if (slides.length === 1) {
+      templateIndex = 0;
+    }
+    var templateSlide = slides[templateIndex] || slides[0];
 
     // Read approved shoutouts from GenYES Moderation Queue
     var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -1026,9 +1032,10 @@ function updateFeaturedShoutOutSlides(presentationId, limit) {
     }
 
     // Delete existing shout-out slides from previous runs to avoid growing indefinitely
-    // We keep slide 0 (Title) and slide 1 (Template)
+    // We keep all slides up to the template slide (inclusive)
     var slidesToDelete = [];
-    for (var j = slides.length - 1; j >= 2; j--) {
+    var keepCount = templateIndex + 1;
+    for (var j = slides.length - 1; j >= keepCount; j--) {
       slidesToDelete.push(slides[j]);
     }
     slidesToDelete.forEach(function(s) {
