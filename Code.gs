@@ -94,31 +94,67 @@ function processShoutoutSubmission(values) {
   
   Logger.log("Processing Shout-out from " + sender + " (" + email + ") to " + teacher);
   
-  // Resolve House (Grade Cohort) mapping using Roster lookup
-  var house = lookupStudentGrade(email, sender);
+  // Resolve if the submitter is a staff member
+  var staffDirectory = getStaffDirectory();
+  var isStaffSender = false;
+  if (email) {
+    var cleanEmail = email.trim().toLowerCase();
+    for (var sName in staffDirectory) {
+      if (staffDirectory[sName].email.toLowerCase().trim() === cleanEmail) {
+        isStaffSender = true;
+        break;
+      }
+    }
+  }
+  if (!isStaffSender && sender) {
+    var cleanSender = sender.trim().toLowerCase();
+    for (var sName in staffDirectory) {
+      if (sName.toLowerCase().trim() === cleanSender) {
+        isStaffSender = true;
+        break;
+      }
+    }
+  }
+  
+  var house = "Freshmen";
+  var points = 2; // Default student-to-staff points (sender gets 2 points)
+  
+  if (isStaffSender) {
+    // Staff-to-Student Praise Slip
+    // Target is a student, we resolve their house by name
+    house = lookupStudentGrade("", teacher);
+    points = 10; // Student receiver gets 10 points
+    Logger.log("Staff-to-Student VSO detected. Recipient: " + teacher + " (" + house + ") gets " + points + " house points.");
+  } else {
+    // Student-to-Staff Shout-out
+    house = lookupStudentGrade(email, sender);
+    points = 2; // Student sender gets 2 points
+    Logger.log("Student-to-Staff VSO detected. Sender: " + sender + " (" + house + ") gets " + points + " house points.");
+  }
   
   // 1. Log transaction to House Cup ledger
-  updateHouseCupLedger(ss, house, 5); // +5 Points for submitting a shoutout
+  updateHouseCupLedger(ss, house, points);
   
   // 2. Append to GenYES Moderation Queue sheet
   var modSheet = ss.getSheetByName(CONFIG.MODERATION_SHEET_NAME);
   if (!modSheet) {
     modSheet = ss.insertSheet(CONFIG.MODERATION_SHEET_NAME);
-    modSheet.appendRow(["Timestamp", "Sender", "House", "Target Staff", "Category", "Message", "Anonymous", "Status", "Audited By", "Audit Date"]);
-    modSheet.getRange(1, 1, 1, 10).setFontWeight("bold").setBackground("#0c2346").setFontColor("#ffcc04");
+    modSheet.appendRow(["Timestamp", "Sender", "House", "Target Staff", "Category", "Message", "Anonymous", "Status", "Audited By", "Audit Date", "Feature on TV?"]);
+    modSheet.getRange(1, 1, 1, 11).setFontWeight("bold").setBackground("#0c2346").setFontColor("#ffcc04");
   }
   
   modSheet.appendRow([
     timestamp,
     sender,
-    house,
+    house, // Storing student's house (sender for student-to-staff, recipient for staff-to-student)
     teacher,
     category,
     message,
     isAnonymous ? "Yes" : "No",
     "Pending", // Initial status
     "", // Moderator name placeholder
-    ""  // Audit timestamp placeholder
+    "",  // Audit timestamp placeholder
+    false // Feature on TV? (Default to unchecked)
   ]);
   
   Logger.log("Successfully routed shout-out to Moderation Queue.");
@@ -976,7 +1012,7 @@ function calculateHousePoints(slips, pepOverrides) {
  * @param {string} presentationId The Google Slides File ID.
  * @param {number} [limit] Maximum number of shout-outs to display (default: 10).
  */
-function updateFeaturedShoutOutSlides(presentationId, limit) {
+function updateFeaturedShoutOutSlides(presentationId, limit, filterDirection) {
   limit = limit || 10;
   if (!presentationId || presentationId === "YOUR_SLIDES_PRESENTATION_ID_HERE") {
     Logger.log("Google Slides update skipped: No valid presentationId provided.");
@@ -993,11 +1029,9 @@ function updateFeaturedShoutOutSlides(presentationId, limit) {
 
     // Determine the template slide index (0 if no Title/Intro slide, 1 if Title slide is present)
     var sysConfig = getSystemConfig();
-    var templateIndex = 1;
+    var templateIndex = 0; // Default to first slide (index 0) if not specified
     if (sysConfig.SLIDES_TEMPLATE_INDEX !== undefined && sysConfig.SLIDES_TEMPLATE_INDEX !== "") {
       templateIndex = parseInt(sysConfig.SLIDES_TEMPLATE_INDEX);
-    } else if (slides.length === 1) {
-      templateIndex = 0;
     }
     var templateSlide = slides[templateIndex] || slides[0];
 
@@ -1035,13 +1069,43 @@ function updateFeaturedShoutOutSlides(presentationId, limit) {
       }
       
       if (status.toLowerCase() === "approved" && isFeatured) {
-        var isAnonymous = data[i][6] && data[i][6].toString().toLowerCase() === "yes";
+        var senderName = data[i][1] || "Anonymous";
+        var receiverName = data[i][3] || "Staff Member";
+        
+        // Determine if sender is staff
+        var senderIsStaff = false;
+        var staffDirectory = getStaffDirectory();
+        if (senderName && staffDirectory.hasOwnProperty(senderName)) {
+          senderIsStaff = true;
+        }
+        
+        var direction = senderIsStaff ? "staff_to_student" : "student_to_staff";
+        
+        // Filter by direction if specified
+        if (filterDirection && filterDirection !== "all" && direction !== filterDirection) {
+          continue;
+        }
+        
+        var studentName = "";
+        var teacherName = "";
+        
+        if (senderIsStaff) {
+          studentName = receiverName; // Student is the receiver
+          teacherName = senderName;   // Teacher is the sender
+        } else {
+          var isAnonymous = data[i][6] && data[i][6].toString().toLowerCase() === "yes";
+          studentName = isAnonymous ? "Anonymous Copley Indian" : senderName;
+          teacherName = receiverName;
+        }
+        
         approvedShoutouts.push({
-          sender: isAnonymous ? "Anonymous Copley Indian" : (data[i][1] || "Anonymous"),
-          teacher: data[i][3] || "Staff Member",
+          student: studentName,
+          teacher: teacherName,
           category: data[i][4] || "Shout-out",
-          message: data[i][5] || ""
+          message: data[i][5] || "",
+          direction: direction
         });
+        
         if (approvedShoutouts.length >= limit) {
           break;
         }
@@ -1068,22 +1132,38 @@ function updateFeaturedShoutOutSlides(presentationId, limit) {
     approvedShoutouts.forEach(function(shoutout) {
       var newSlide = deck.appendSlide(templateSlide);
       
-      // Replace placeholders in the newly created slide (supporting common variations)
-      newSlide.replaceAllText("{{MESSAGE}}", shoutout.message);
-      newSlide.replaceAllText("{{message}}", shoutout.message);
+      // Build dynamic placeholders dictionary supporting all variations/typos
+      var placeholders = {
+        message: shoutout.message,
+        teacher: shoutout.teacher,
+        staff: shoutout.teacher,
+        sender: shoutout.student,
+        student: shoutout.student,
+        category: shoutout.category
+      };
       
-      newSlide.replaceAllText("{{TEACHER}}", shoutout.teacher);
-      newSlide.replaceAllText("{{teacher}}", shoutout.teacher);
-      newSlide.replaceAllText("{{STAFF}}", shoutout.teacher);
-      newSlide.replaceAllText("{{staff}}", shoutout.teacher);
+      // Add custom TO and FROM based on direction
+      if (shoutout.direction === "student_to_staff") {
+        placeholders["to"] = shoutout.teacher;
+        placeholders["from"] = shoutout.student;
+      } else {
+        placeholders["to"] = shoutout.student;
+        placeholders["from"] = shoutout.teacher;
+      }
       
-      newSlide.replaceAllText("{{SENDER}}", shoutout.sender);
-      newSlide.replaceAllText("{{sender}}", shoutout.sender);
-      newSlide.replaceAllText("{{STUDENT}}", shoutout.sender);
-      newSlide.replaceAllText("{{student}}", shoutout.sender);
-      
-      newSlide.replaceAllText("{{CATEGORY}}", shoutout.category);
-      newSlide.replaceAllText("{{category}}", shoutout.category);
+      // Replace double-brace and single-brace variations
+      for (var key in placeholders) {
+        var val = placeholders[key];
+        var keyUpper = key.toUpperCase();
+        var keyLower = key.toLowerCase();
+        
+        newSlide.replaceAllText("{{" + keyUpper + "}}", val);
+        newSlide.replaceAllText("{{" + keyLower + "}}", val);
+        newSlide.replaceAllText("{" + keyUpper + "}", val);
+        newSlide.replaceAllText("{" + keyLower + "}", val);
+        newSlide.replaceAllText("{{ " + keyUpper + " }}", val);
+        newSlide.replaceAllText("{{ " + keyLower + " }}", val);
+      }
     });
 
     Logger.log("Successfully generated " + approvedShoutouts.length + " featured shout-out slides!");
@@ -1471,15 +1551,43 @@ function showTriggerSetupGuide() {
 function triggerSlidesSyncManual() {
   var sysConfig = getSystemConfig();
   var presentationId = sysConfig.SLIDES_PRESENTATION_ID;
+  var staffPresentationId = sysConfig.STAFF_SLIDES_PRESENTATION_ID || sysConfig.STAFF_TO_STUDENT_SLIDES_ID;
   
-  if (!presentationId || presentationId === "YOUR_SLIDES_PRESENTATION_ID_HERE") {
-    SpreadsheetApp.getUi().alert("Error: No valid SLIDES_PRESENTATION_ID found in _System_Config sheet tab. Please configure it first.");
+  if ((!presentationId || presentationId === "YOUR_SLIDES_PRESENTATION_ID_HERE") && (!staffPresentationId || staffPresentationId === "YOUR_STAFF_SLIDES_PRESENTATION_ID_HERE")) {
+    SpreadsheetApp.getUi().alert("Error: No valid SLIDES_PRESENTATION_ID or STAFF_SLIDES_PRESENTATION_ID found in _System_Config sheet tab. Please configure it first.");
     return;
   }
   
   SpreadsheetApp.getActiveSpreadsheet().toast("Starting Google Slides signage update...", "Slides Sync", 3);
-  updateFeaturedShoutOutSlides(presentationId, 15);
+  runSlidesSync(sysConfig);
   SpreadsheetApp.getActiveSpreadsheet().toast("Google Slides signage sync complete!", "Slides Sync", 5);
+}
+
+/**
+ * Triggers slides synchronization for all configured presentations.
+ */
+function runSlidesSync(sysConfig) {
+  var presentationId = sysConfig.SLIDES_PRESENTATION_ID;
+  var staffPresentationId = sysConfig.STAFF_SLIDES_PRESENTATION_ID || sysConfig.STAFF_TO_STUDENT_SLIDES_ID;
+  
+  var hasStudentDeck = (presentationId && presentationId !== "YOUR_SLIDES_PRESENTATION_ID_HERE" && presentationId !== "");
+  var hasStaffDeck = (staffPresentationId && staffPresentationId !== "YOUR_STAFF_SLIDES_PRESENTATION_ID_HERE" && staffPresentationId !== "" && staffPresentationId !== presentationId);
+  
+  if (hasStudentDeck) {
+    if (hasStaffDeck) {
+      // Sync student-to-staff to main presentation, staff-to-student to staff presentation
+      updateFeaturedShoutOutSlides(presentationId, 15, "student_to_staff");
+      updateFeaturedShoutOutSlides(staffPresentationId, 15, "staff_to_student");
+    } else {
+      // Sync all to the same presentation
+      updateFeaturedShoutOutSlides(presentationId, 15);
+    }
+  } else if (hasStaffDeck) {
+    // Sync only staff-to-student
+    updateFeaturedShoutOutSlides(staffPresentationId, 15, "staff_to_student");
+  } else {
+    Logger.log("No valid slide presentations configured for sync.");
+  }
 }
 
 /**
@@ -1528,7 +1636,7 @@ function onEditTrigger(e) {
   var isFeatureEdited = (featureCol !== -1 && startCol <= featureCol && endCol >= featureCol);
   
   if (isStatusEdited || isFeatureEdited) {
-    var runSync = false;
+    var runSync = true; // Always trigger a sync when these columns change to handle both checkbox additions and slide deletions
     var auditUser = "Unknown Operator";
     try {
       auditUser = Session.getActiveUser().getEmail() || "GenYES Operator";
@@ -1540,8 +1648,6 @@ function onEditTrigger(e) {
     for (var r = startRow; r <= endRow; r++) {
       if (r === 1) continue; // Skip header row
       
-      var isApproved = false;
-      
       if (isStatusEdited) {
         var statusVal = sheet.getRange(r, statusCol).getValue().toString().trim();
         var statusValLower = statusVal.toLowerCase();
@@ -1551,45 +1657,18 @@ function onEditTrigger(e) {
           sheet.getRange(r, 9).setValue(auditUser);
           // Set Audit Date in Column 10 (Col J)
           sheet.getRange(r, 10).setValue(auditDate);
-          
-          if (statusValLower === "approved") {
-            isApproved = true;
-          }
-        }
-      } else {
-        // Status was not edited, check if it was already approved
-        var currentStatus = sheet.getRange(r, statusCol).getValue().toString().trim().toLowerCase();
-        if (currentStatus === "approved") {
-          isApproved = true;
-        }
-      }
-      
-      if (isApproved) {
-        // Verify Feature on TV is checked
-        if (featureCol !== -1) {
-          var featVal = sheet.getRange(r, featureCol).getValue().toString().trim().toLowerCase();
-          var isFeatured = (featVal === "yes" || featVal === "true" || featVal === "1" || sheet.getRange(r, featureCol).getValue() === true);
-          if (isFeatured) {
-            runSync = true;
-          }
-        } else {
-          // No Feature on TV column, default to sync all approved
-          runSync = true;
         }
       }
     }
     
     if (runSync) {
       var sysConfig = getSystemConfig();
-      var presentationId = sysConfig.SLIDES_PRESENTATION_ID;
-      if (presentationId && presentationId !== "YOUR_SLIDES_PRESENTATION_ID_HERE" && presentationId !== "") {
-        try {
-          sheet.getParent().toast("Syncing approved shout-outs to Google Slides...", "Slides Sync", 3);
-          updateFeaturedShoutOutSlides(presentationId, 15);
-          sheet.getParent().toast("Google Slides signage sync complete!", "Slides Sync", 5);
-        } catch(err) {
-          Logger.log("Failed automatic Slides sync: " + err.toString());
-        }
+      try {
+        sheet.getParent().toast("Syncing approved shout-outs to Google Slides...", "Slides Sync", 3);
+        runSlidesSync(sysConfig);
+        sheet.getParent().toast("Google Slides signage sync complete!", "Slides Sync", 5);
+      } catch(err) {
+        Logger.log("Failed automatic Slides sync: " + err.toString());
       }
     }
   }

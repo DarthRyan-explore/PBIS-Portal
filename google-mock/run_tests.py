@@ -501,8 +501,262 @@ if digest_passed:
 else:
     print("\n❌ TEST CASE 3 FAILED.")
 
+
+# --- TEST CASE 4: processShoutoutSubmission & updateFeaturedShoutOutSlides ---
+print("\n----------------------------------------------------------------")
+print("TEST CASE 4: processShoutoutSubmission & Slides Sync verification")
+print("----------------------------------------------------------------")
+
+mock_slides_and_routing_js = """
+var mockSheets = {
+  "House_Cup_Totals": [
+    ["House Name", "Total Points", "Last Updated"]
+  ],
+  "GenYES_Moderation_Queue": [
+    ["Timestamp", "Sender", "House", "Target Staff", "Category", "Message", "Anonymous", "Status", "Audited By", "Audit Date", "Feature on TV?"]
+  ],
+  "Staff_Directory": [
+    ["Last Name", "First Name", "Staff Classification", "Department / Specific Role", "Email"],
+    ["Janiga", "Sarah", "Teacher", "Science", "sarah.janiga@copley-fairlawn.org"]
+  ],
+  "Master_Roster": [
+    ["First Name", "Last Name", "Email", "Grade"],
+    ["Frodo", "Baggins", "frodo.b@copley-fairlawn.org", "Senior"],
+    ["Ahsoka", "Tano", "ahsoka.t@copley-fairlawn.org", "Junior"]
+  ],
+  "_System_Config": [
+    ["Setting Name", "Value"],
+    ["SLIDES_PRESENTATION_ID", "mock-deck-id"]
+  ]
+};
+
+var SpreadsheetApp = {
+  getActiveSpreadsheet: function() {
+    return {
+      getSheetByName: function(name) {
+        if (!mockSheets[name]) {
+          mockSheets[name] = [];
+        }
+        return {
+          getName: function() { return name; },
+          getDataRange: function() {
+            return {
+              getValues: function() { return mockSheets[name]; }
+            };
+          },
+          appendRow: function(row) {
+            mockSheets[name].push(row);
+          },
+          getRange: function(row, col) {
+            return {
+              setValue: function(val) {
+                if (!mockSheets[name][row - 1]) {
+                  mockSheets[name][row - 1] = [];
+                }
+                mockSheets[name][row - 1][col - 1] = val;
+              },
+              getValue: function() {
+                if (!mockSheets[name][row - 1]) return "";
+                return mockSheets[name][row - 1][col - 1];
+              }
+            };
+          }
+        };
+      },
+      getSheets: function() {
+        return Object.keys(mockSheets).map(function(n) {
+          return {
+            getName: function() { return n; },
+            getDataRange: function() {
+              return { getValues: function() { return mockSheets[n]; } };
+            }
+          };
+        });
+      }
+    };
+  }
+};
+
+var replacedTexts = [];
+var generatedSlideCount = 0;
+var deletedSlideCount = 0;
+
+var SlidesApp = {
+  openById: function(id) {
+    return {
+      getSlides: function() {
+        return [
+          {
+            // Template slide
+            remove: function() { deletedSlideCount++; },
+            replaceAllText: function(target, val) {
+              replacedTexts.push({ target: target, val: val });
+            }
+          }
+        ];
+      },
+      appendSlide: function(slide) {
+        generatedSlideCount++;
+        return {
+          replaceAllText: function(target, val) {
+            replacedTexts.push({ target: target, val: val });
+          }
+        };
+      }
+    };
+  }
+};
+
+function runTest4() {
+  // Test 1: Student-to-Staff submission
+  processShoutoutSubmission([
+    "2026-06-10 12:00:00",
+    "frodo.b@copley-fairlawn.org",
+    "Frodo",
+    "Baggins",
+    "Sarah Janiga",
+    "GOAT VSO",
+    "Best teacher ever!",
+    "No"
+  ]);
+  
+  // Test 2: Staff-to-Student submission (praise)
+  processShoutoutSubmission([
+    "2026-06-10 12:05:00",
+    "sarah.janiga@copley-fairlawn.org",
+    "Sarah",
+    "Janiga",
+    "Ahsoka Tano",
+    "Academic Excellence",
+    "Fantastic math work!",
+    "No"
+  ]);
+  
+  // Set first two approved & featured, third not featured
+  // Format of GenYES queue: Timestamp, Sender, House, Target Staff, Category, Message, Anonymous, Status, Audited By, Audit Date, Feature on TV?
+  mockSheets["GenYES_Moderation_Queue"][1][7] = "Approved"; // Frodo
+  mockSheets["GenYES_Moderation_Queue"][1][10] = true;      // Feature on TV
+  
+  mockSheets["GenYES_Moderation_Queue"][2][7] = "Approved"; // Ahsoka
+  mockSheets["GenYES_Moderation_Queue"][2][10] = true;      // Feature on TV
+  
+  // Append a non-featured approved row to test exclusion
+  mockSheets["GenYES_Moderation_Queue"].push([
+    "2026-06-10 12:10:00",
+    "Luke Skywalker",
+    "Sophomores",
+    "Sarah Janiga",
+    "GOAT VSO",
+    "Thanks!",
+    "No",
+    "Approved",
+    "GenYES Operator",
+    new Date(),
+    false // Feature on TV false
+  ]);
+  
+  // Run slides sync
+  updateFeaturedShoutOutSlides("mock-deck-id", 10);
+  
+  return JSON.stringify({
+    ledger: mockSheets["House_Cup_Totals"],
+    queue: mockSheets["GenYES_Moderation_Queue"],
+    generatedSlideCount: generatedSlideCount,
+    replacedTexts: replacedTexts
+  });
+}
+"""
+
+full_test_4_code = code_content + "\n" + mock_slides_and_routing_js + "\n" + "function run_wrapper() { return runTest4(); }"
+
+proc = subprocess.Popen(
+    ["osascript", "-l", "JavaScript"],
+    stdin=subprocess.PIPE,
+    stdout=subprocess.PIPE,
+    stderr=subprocess.PIPE,
+    text=True
+)
+stdout, stderr = proc.communicate(input=full_test_4_code + "\nrun_wrapper();")
+
+if proc.returncode != 0:
+    print("❌ Compilation or Runtime error in Test Case 4:")
+    print(stderr)
+    exit(1)
+
+test_4_results = json.loads(stdout.strip())
+
+# Verifications
+t4_passed = True
+
+# 1. House Cup Totals check
+# Student-to-staff (Frodo Baggins - Seniors) earns 2 points
+# Staff-to-student (Sarah Janiga to Ahsoka Tano - Juniors) earns 10 points
+seniors_pts = 0
+juniors_pts = 0
+for row in test_4_results["ledger"][1:]:
+    if row[0] == "Seniors":
+        seniors_pts = row[1]
+    elif row[0] == "Juniors":
+        juniors_pts = row[1]
+
+if seniors_pts != 2:
+    print(f"❌ Student-to-staff routing score mismatch. Expected Seniors: 2, Got: {seniors_pts}")
+    t4_passed = False
+else:
+    print("✅ Student-to-staff resolved points (2 points to Seniors) verified!")
+
+if juniors_pts != 10:
+    print(f"❌ Staff-to-student routing score mismatch. Expected Juniors: 10, Got: {juniors_pts}")
+    t4_passed = False
+else:
+    print("✅ Staff-to-student resolved points (10 points to Juniors) verified!")
+
+# 2. Slide count verification
+# 2 slides should be generated (Luke Skywalker is excluded since Feature on TV is false)
+if test_4_results["generatedSlideCount"] != 2:
+    print(f"❌ Slide sync count mismatch. Expected: 2, Got: {test_4_results['generatedSlideCount']}")
+    t4_passed = False
+else:
+    print("✅ Slide sync checkbox gating (excluding non-featured approved rows) verified!")
+
+# 3. Placeholder replacements checks
+# Verify that TO and FROM are replaced correctly based on direction
+found_frodo_to = False
+found_frodo_from = False
+found_ahsoka_to = False
+found_ahsoka_from = False
+
+for r in test_4_results["replacedTexts"]:
+    if r["target"] == "{{TO}}" or r["target"] == "{{to}}":
+        if r["val"] == "Sarah Janiga":
+            found_frodo_to = True
+        elif r["val"] == "Ahsoka Tano":
+            found_ahsoka_to = True
+    elif r["target"] == "{{FROM}}" or r["target"] == "{{from}}":
+        if r["val"] == "Frodo Baggins":
+            found_frodo_from = True
+        elif r["val"] == "Sarah Janiga":
+            found_ahsoka_from = True
+
+if not (found_frodo_to and found_frodo_from):
+    print("❌ Placeholders error: Student-to-staff TO/FROM not set correctly.")
+    t4_passed = False
+else:
+    print("✅ Student-to-staff TO/FROM placeholder replacement verified!")
+
+if not (found_ahsoka_to and found_ahsoka_from):
+    print("❌ Placeholders error: Staff-to-student TO/FROM not set correctly.")
+    t4_passed = False
+else:
+    print("✅ Staff-to-student TO/FROM placeholder replacement verified!")
+
+if t4_passed:
+    print("\n✨ TEST CASE 4 PASSED! Routing, slide sync checkboxes, and placeholder logic are perfect.")
+else:
+    print("\n❌ TEST CASE 4 FAILED.")
+
 print("\n================================================================")
-if scan_passed and economy_passed and digest_passed:
+if scan_passed and economy_passed and digest_passed and t4_passed:
     print("🎉 ALL CODE.GS BACKEND SIMULATION TESTS PASSED SUCCESSFULLY!")
     exit(0)
 else:
