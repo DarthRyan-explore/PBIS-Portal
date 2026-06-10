@@ -2748,6 +2748,33 @@
               </div>
             </div>
           </div>
+
+          <!-- 📡 Scoreboard Live Sync API Configuration Card -->
+          <div class="bg-white border border-slate-200/80 p-5 rounded-2xl shadow-glass mt-4">
+            <h3 class="text-sm font-black text-copley-blue mb-2.5 flex items-center gap-2 heading-style border-b border-slate-100 pb-2.5">
+              <i class="fa-solid fa-satellite-dish text-copley-gold"></i>
+              <span>📡 Scoreboard Live Sync API Configuration</span>
+            </h3>
+            <p class="text-[11px] text-slate-400 mb-4 font-semibold leading-relaxed">
+              Paste your published Google Apps Script Web App URL below to connect this web portal dynamically to your live Google Sheets backend. This will automatically pull the latest House Cup points and Department standings in real-time.
+            </p>
+
+            <div class="space-y-3">
+              <div>
+                <label for="scoreboardApiUrlInput" class="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Spreadsheet Web App API URL</label>
+                <input type="url" id="scoreboardApiUrlInput" placeholder="https://script.google.com/macros/s/.../exec" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-copley-blue font-medium" />
+              </div>
+              <div class="flex gap-2">
+                <button onclick="saveScoreboardApiSettings()" class="flex-1 bg-copley-blue hover:bg-copley-blue/90 text-copley-gold hover:text-white font-black py-2 rounded-lg text-[10px] uppercase tracking-wider transition active:scale-[0.98]">
+                  <i class="fa-solid fa-save mr-1.5"></i>Save Settings
+                </button>
+                <button onclick="clearScoreboardApiSettings()" class="bg-slate-150 hover:bg-slate-200 text-slate-600 font-bold px-3 py-2 rounded-lg text-[10px] uppercase tracking-wider transition active:scale-[0.98]">
+                  Reset
+                </button>
+              </div>
+              <div id="scoreboardSyncStatus" class="text-[10px] text-slate-400 font-semibold mt-2 hidden"></div>
+            </div>
+          </div>
         </div>
 
       </section>
@@ -5109,6 +5136,19 @@
         }
       }
 
+      // Live Department Standings Override
+      if (AppState.liveDeptScores) {
+        AppState.liveDeptScores.forEach(deptObj => {
+          const name = deptObj.name;
+          const pts = deptObj.points;
+          if (!scores[name]) {
+            scores[name] = { vsoPoints: 0, mtssPoints: 0, ccPoints: 0, total: 0, vsoCount: 0, mtssCount: 0, ccCount: 0 };
+          }
+          scores[name].total = pts;
+        });
+        return scores;
+      }
+
       // 1. Walk through AppState.teacherStats (cumulative VSO counts per staff member)
       for (let teacherName in AppState.teacherStats) {
         if (StaffDirectory[teacherName]) {
@@ -5488,10 +5528,17 @@
     function hydrateClassClashLeaderboard() {
       // Calculate active scores for all students by class group
       const scores = { seniors: 0, juniors: 0, sophomores: 0, freshmen: 0 };
-      AppState.students.forEach(std => {
-        const grp = getStudentGradeGroup(std);
-        scores[grp] += std.points;
-      });
+      if (AppState.liveHouseScores) {
+        scores.seniors = AppState.liveHouseScores.Seniors || 0;
+        scores.juniors = AppState.liveHouseScores.Juniors || 0;
+        scores.sophomores = AppState.liveHouseScores.Sophomores || 0;
+        scores.freshmen = AppState.liveHouseScores.Freshmen || 0;
+      } else {
+        AppState.students.forEach(std => {
+          const grp = getStudentGradeGroup(std);
+          scores[grp] += std.points;
+        });
+      }
 
       // Update text scores in the HTML if elements exist
       const seniorsScore = document.getElementById('classClashScore-seniors');
@@ -8582,6 +8629,93 @@
       renderRewardsFulfillment();
     }
 
+    // Live Scoreboard Sync Configuration
+    function saveScoreboardApiSettings() {
+      const urlInput = document.getElementById('scoreboardApiUrlInput');
+      const url = urlInput ? urlInput.value.trim() : '';
+      
+      if (url) {
+        localStorage.setItem('AppState_scoreboardApiUrl', url);
+        showToast("Settings Saved! 📡", "Live Scoreboard API URL updated successfully. Attempting to sync...");
+        syncScoreboardWithLiveAPI(url);
+      } else {
+        clearScoreboardApiSettings();
+      }
+    }
+
+    function clearScoreboardApiSettings() {
+      localStorage.removeItem('AppState_scoreboardApiUrl');
+      const urlInput = document.getElementById('scoreboardApiUrlInput');
+      if (urlInput) urlInput.value = '';
+      
+      AppState.liveHouseScores = null;
+      AppState.liveDeptScores = null;
+      
+      // Re-render based on local AppState mock data
+      hydrateScoreboard();
+      updateDepartmentLeaderboard();
+      
+      const statusEl = document.getElementById('scoreboardSyncStatus');
+      if (statusEl) {
+        statusEl.classList.remove('hidden');
+        statusEl.className = "text-[10px] text-slate-500 font-semibold mt-2";
+        statusEl.innerHTML = `<i class="fa-solid fa-circle-info mr-1"></i>Scoreboard reset to local mock baseline data.`;
+      }
+      
+      showToast("Settings Reset! 📡", "Cleared Live API sync settings. Scoreboard returned to offline mock state.");
+      playSynthClick();
+    }
+
+    function syncScoreboardWithLiveAPI(apiUrl) {
+      apiUrl = apiUrl || localStorage.getItem('AppState_scoreboardApiUrl');
+      if (!apiUrl) {
+        const urlInput = document.getElementById('scoreboardApiUrlInput');
+        if (urlInput) urlInput.value = '';
+        return;
+      }
+      
+      const urlInput = document.getElementById('scoreboardApiUrlInput');
+      if (urlInput) urlInput.value = apiUrl;
+      
+      const statusEl = document.getElementById('scoreboardSyncStatus');
+      if (statusEl) {
+        statusEl.classList.remove('hidden');
+        statusEl.className = "text-[10px] text-amber-500 font-semibold mt-2";
+        statusEl.innerHTML = `<i class="fa-solid fa-spinner fa-spin mr-1"></i>Syncing scores with live Google Sheet...`;
+      }
+      
+      fetch(apiUrl)
+        .then(response => {
+          if (!response.ok) throw new Error("HTTP error " + response.status);
+          return response.json();
+        })
+        .then(data => {
+          if (data && data.houses && data.departments) {
+            AppState.liveHouseScores = data.houses;
+            AppState.liveDeptScores = data.departments;
+            
+            // Re-render UI with live points
+            hydrateScoreboard();
+            updateDepartmentLeaderboard();
+            
+            if (statusEl) {
+              statusEl.className = "text-[10px] text-emerald-600 font-semibold mt-2";
+              statusEl.innerHTML = `<i class="fa-solid fa-circle-check mr-1"></i>Scoreboard synced successfully with Google Sheets!`;
+            }
+          } else {
+            throw new Error("Invalid API payload format");
+          }
+        })
+        .catch(err => {
+          console.error("Live Scoreboard Sync Failed:", err);
+          if (statusEl) {
+            statusEl.className = "text-[10px] text-rose-500 font-semibold mt-2";
+            statusEl.innerHTML = `<i class="fa-solid fa-triangle-exclamation mr-1"></i>Sync failed. Check API URL or sheets web app deployment.`;
+          }
+          showToast("Sync Failed! 📡", "Unable to pull live scores from your Google Sheets Web App. Check configuration.", "error");
+        });
+    }
+
     // System Startup
     window.onload = function() {
       // Dynamic Staff Statistics Seeding
@@ -8695,6 +8829,9 @@
       updateSidebarMTSSAlerts();
       updateTeacherBadges();
       updateDepartmentLeaderboard();
+      
+      // Auto-trigger live sync if scoreboard API URL exists in local storage
+      syncScoreboardWithLiveAPI();
     };
 
     // =========================================================================
