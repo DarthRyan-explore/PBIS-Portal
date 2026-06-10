@@ -118,13 +118,21 @@ function processShoutoutSubmission(values) {
   
   var house = "Freshmen";
   var points = 2; // Default student-to-staff points (sender gets 2 points)
+  var status = "Pending";
+  var auditedBy = "";
+  var auditDate = "";
+  var featureOnTv = false;
   
   if (isStaffSender) {
     // Staff-to-Student Praise Slip
     // Target is a student, we resolve their house by name
     house = lookupStudentGrade("", teacher);
     points = 10; // Student receiver gets 10 points
-    Logger.log("Staff-to-Student VSO detected. Recipient: " + teacher + " (" + house + ") gets " + points + " house points.");
+    status = "Approved";
+    auditedBy = "Auto-Approved (Staff)";
+    auditDate = new Date();
+    featureOnTv = true;
+    Logger.log("Staff-to-Student VSO detected. Recipient: " + teacher + " (" + house + ") gets " + points + " house points (Auto-Approved).");
   } else {
     // Student-to-Staff Shout-out
     house = lookupStudentGrade(email, sender);
@@ -151,13 +159,30 @@ function processShoutoutSubmission(values) {
     category,
     message,
     isAnonymous ? "Yes" : "No",
-    "Pending", // Initial status
-    "", // Moderator name placeholder
-    "",  // Audit timestamp placeholder
-    false // Feature on TV? (Default to unchecked)
+    status,
+    auditedBy,
+    auditDate,
+    featureOnTv
   ]);
   
   Logger.log("Successfully routed shout-out to Moderation Queue.");
+  
+  // For auto-approved staff submissions, trigger immediate slide sync
+  if (isStaffSender) {
+    var sysConfig = getSystemConfig();
+    var presentationId = sysConfig.SLIDES_PRESENTATION_ID;
+    var staffPresentationId = sysConfig.STAFF_SLIDES_PRESENTATION_ID || sysConfig.STAFF_TO_STUDENT_SLIDES_ID;
+    
+    if ((presentationId && presentationId !== "YOUR_SLIDES_PRESENTATION_ID_HERE" && presentationId !== "") ||
+        (staffPresentationId && staffPresentationId !== "YOUR_STAFF_SLIDES_PRESENTATION_ID_HERE" && staffPresentationId !== "")) {
+      try {
+        runSlidesSync(sysConfig);
+        Logger.log("Successfully ran auto-sync of staff shoutout to slides.");
+      } catch (err) {
+        Logger.log("Failed auto-sync staff shoutout to slides: " + err.toString());
+      }
+    }
+  }
 }
 
 /**

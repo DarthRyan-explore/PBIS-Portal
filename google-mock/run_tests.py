@@ -632,13 +632,11 @@ function runTest4() {
     "No"
   ]);
   
-  // Set first two approved & featured, third not featured
+  // Set first approved & featured, third not featured.
+  // Note: Second (Ahsoka) is staff-to-student, which is auto-approved and auto-featured by processShoutoutSubmission!
   // Format of GenYES queue: Timestamp, Sender, House, Target Staff, Category, Message, Anonymous, Status, Audited By, Audit Date, Feature on TV?
-  mockSheets["GenYES_Moderation_Queue"][1][7] = "Approved"; // Frodo
+  mockSheets["GenYES_Moderation_Queue"][1][7] = "Approved"; // Frodo (Student-to-Staff needs manual approval)
   mockSheets["GenYES_Moderation_Queue"][1][10] = true;      // Feature on TV
-  
-  mockSheets["GenYES_Moderation_Queue"][2][7] = "Approved"; // Ahsoka
-  mockSheets["GenYES_Moderation_Queue"][2][10] = true;      // Feature on TV
   
   // Append a non-featured approved row to test exclusion
   mockSheets["GenYES_Moderation_Queue"].push([
@@ -654,6 +652,10 @@ function runTest4() {
     new Date(),
     false // Feature on TV false
   ]);
+  
+  // Reset counters before final manual sync to only count the second sync
+  generatedSlideCount = 0;
+  replacedTexts = [];
   
   // Run slides sync
   updateFeaturedShoutOutSlides("mock-deck-id", 10);
@@ -749,6 +751,18 @@ if not (found_ahsoka_to and found_ahsoka_from):
     t4_passed = False
 else:
     print("✅ Staff-to-student TO/FROM placeholder replacement verified!")
+
+# 4. Auto-Approval Verification
+staff_vso_row = test_4_results["queue"][2]
+status_val = staff_vso_row[7]
+auditor_val = staff_vso_row[8]
+featured_val = staff_vso_row[10]
+
+if status_val != "Approved" or auditor_val != "Auto-Approved (Staff)" or featured_val is not True:
+    print(f"❌ Auto-approval check failed. Expected: Approved/Auto-Approved (Staff)/True, Got: {status_val}/{auditor_val}/{featured_val}")
+    t4_passed = False
+else:
+    print("✅ Staff-to-student auto-approval and slide auto-gating verified!")
 
 if t4_passed:
     print("\n✨ TEST CASE 4 PASSED! Routing, slide sync checkboxes, and placeholder logic are perfect.")
