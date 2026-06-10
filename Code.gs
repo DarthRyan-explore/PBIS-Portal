@@ -171,7 +171,16 @@ function getSystemConfig() {
   
   try {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var sheet = ss.getSheetByName("_System_Config");
+    var sheets = ss.getSheets();
+    var sheet = null;
+    for (var i = 0; i < sheets.length; i++) {
+      var nameNormalized = sheets[i].getName().toLowerCase().replace(/[\s_]/g, "");
+      if (nameNormalized === "systemconfig") {
+        sheet = sheets[i];
+        break;
+      }
+    }
+    
     if (sheet) {
       var data = sheet.getDataRange().getValues();
       for (var i = 0; i < data.length; i++) {

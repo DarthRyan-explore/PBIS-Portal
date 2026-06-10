@@ -383,6 +383,19 @@ var SpreadsheetApp = {{
             }};
           }}
         }};
+      }},
+      getSheets: function() {{
+        var sheetNames = Object.keys(mockSheets);
+        return sheetNames.map(function(name) {{
+          return {{
+            getName: function() {{ return name; }},
+            getDataRange: function() {{
+              return {{
+                getValues: function() {{ return mockSheets[name]; }}
+              }};
+            }}
+          }};
+        }});
       }}
     }};
   }}
