@@ -798,7 +798,7 @@ function compileStaffDigestHTML(name, praiseCount, mtssCount, isTeacher, activeC
     '  <div style="max-width: 650px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 12px rgba(12,35,70,0.05); background-color: #ffffff;">',
     '    <!-- Header Banner -->',
     '    <div style="background-color: #0c2346; text-align: center; border-bottom: 6px solid #ffcc04; overflow: hidden; padding: 0;">',
-    '      <img src="https://raw.githubusercontent.com/DarthRyan-explore/PBIS-Portal/google-workspace-pivot/assets/copley_pbis_banner.png?v=3" alt="Copley High School Weekly PBIS Staff Report" style="display: block; width: 100%; height: auto; max-width: 650px; margin: 0 auto;" />',
+    '      <img src="https://raw.githubusercontent.com/DarthRyan-explore/PBIS-Portal/google-workspace-pivot/assets/Copley_PBIS_banner_02.png?v=4" alt="Copley High School Weekly PBIS Staff Report" style="display: block; width: 100%; height: auto; max-width: 650px; margin: 0 auto;" />',
     '    </div>',
     '    ',
     '    <!-- Body -->',
