@@ -784,6 +784,7 @@ function compileStaffDigestHTML(name, praiseCount, mtssCount, isTeacher, activeC
   weeklyVSOs = weeklyVSOs || [];
   sortedDepts = sortedDepts || [];
   teacherDept = teacherDept || "General Staff";
+  var weeklyPoints = praiseCount * 10;
   
   var mtssSection = "";
   var sysConfig = getSystemConfig();
@@ -793,14 +794,14 @@ function compileStaffDigestHTML(name, praiseCount, mtssCount, isTeacher, activeC
       var mtssNoCaseloads = [
         "You currently have no students on your active Tier 1 caseload. You have successfully Matrix-dodged additional paperwork this week. Enjoy the peace while it lasts.",
         "Your active caseload is currently empty. No strategy logging required. Go ahead and take credit for a job well done anyway.",
-        "No active caseload students assigned to you this week. Zero paperwork due. Have a relaxing, form-free weekend!"
+        "No active caseload students assigned to you this week. Zero paperwork due. Have a relaxing, form-free weekend."
       ];
       var mtssNoCaseloadText = mtssNoCaseloads[Math.floor(Math.random() * mtssNoCaseloads.length)];
       
       mtssSection = [
-        '<div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin-top: 25px;">',
-        '  <h3 style="color: #5e738b; margin-top: 0; font-family: Arial, sans-serif; font-size: 13px; text-transform: uppercase; letter-spacing: 1px; font-weight: bold;">📋 MTSS Caseload: Empty</h3>',
-        '  <p style="color: #36506e; font-size: 13px; margin: 0; line-height: 1.6;">',
+        '<div style="background-color: #ffffff; border: 3px solid #0c2346; border-top: 8px solid #64748b; border-radius: 16px; padding: 25px; margin-top: 25px; box-shadow: 0 6px 16px rgba(12,35,70,0.04);">',
+        '  <h3 style="color: #0c2346; margin: 0 0 12px 0; font-family: Arial, sans-serif; font-size: 15px; text-transform: uppercase; letter-spacing: 1px; font-weight: 900;">📋 MTSS Caseload: Empty</h3>',
+        '  <p style="color: #475569; font-size: 13px; margin: 0; line-height: 1.6; font-family: Arial, sans-serif;">',
         '    ' + mtssNoCaseloadText,
         '  </p>',
         '</div>'
@@ -819,21 +820,23 @@ function compileStaffDigestHTML(name, praiseCount, mtssCount, isTeacher, activeC
         var preFilledUrl = getPreFilledFormUrl(s, sysConfig);
         var triggerText = s.trigger || "Unknown";
         studentRows.push(
-          '    <li style="margin-bottom: 10px; line-height: 1.5; color: #334155;">',
+          '    <li style="margin-bottom: 14px; line-height: 1.5; color: #334155; list-style-position: inside;">',
           '      <strong style="color: #0c2346; font-size: 13px;">' + s.name + '</strong> — <em style="color: #475569; font-size: 13px;">' + s.class + ' (' + s.mod + ')</em>',
-          '      <span style="font-size: 11px; color: #64748b; display: block; margin: 2px 0 4px 0;">Referral: ' + triggerText + '</span>',
-          '      <a href="' + preFilledUrl + '" target="_blank" style="background-color: #be123c; color: #ffffff; padding: 3px 10px; text-decoration: none; border-radius: 4px; font-weight: bold; font-size: 10px; display: inline-block; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 2px;">Log Intervention</a>',
+          '      <span style="font-size: 11px; color: #64748b; display: block; margin: 2px 0 6px 0; padding-left: 20px;">Referral: ' + triggerText + '</span>',
+          '      <div style="padding-left: 20px;">',
+          '        <a href="' + preFilledUrl + '" target="_blank" style="background-color: #be123c; color: #ffffff; padding: 6px 14px; text-decoration: none; border-radius: 6px; font-weight: 900; font-size: 10px; display: inline-block; text-transform: uppercase; letter-spacing: 0.8px; border: 1.5px solid #ffcc04; box-shadow: 0 2px 4px rgba(12,35,70,0.1);">Log Intervention</a>',
+          '      </div>',
           '    </li>'
         );
       });
       
       mtssSection = [
-        '<div style="background-color: #fff1f2; border: 1px solid #fecdd3; border-radius: 12px; padding: 20px; margin-top: 25px;">',
-        '  <h3 style="color: #be123c; margin-top: 0; font-family: Arial, sans-serif; font-size: 13px; text-transform: uppercase; letter-spacing: 1px; font-weight: bold;">⚠️ MTSS Strategy Logs Outstanding</h3>',
-        '  <p style="color: #4b5563; font-size: 13px; margin: 5px 0 15px 0; line-height: 1.6;">',
+        '<div style="background-color: #ffffff; border: 3px solid #be123c; border-radius: 16px; padding: 25px; margin-top: 25px; box-shadow: 0 6px 16px rgba(190,18,60,0.06); border-top: 8px solid #be123c;">',
+        '  <h3 style="color: #be123c; margin: 0 0 12px 0; font-family: Arial, sans-serif; font-size: 15px; text-transform: uppercase; letter-spacing: 1px; font-weight: 900;">⚠️ MTSS Strategy Logs Outstanding</h3>',
+        '  <p style="color: #475569; font-size: 13px; margin: 0 0 16px 0; line-height: 1.6; font-family: Arial, sans-serif;">',
         '    ' + mtssWarningText,
         '  </p>',
-        '  <ul style="margin: 0 0 10px 0; padding-left: 20px; line-height: 1.6; list-style-type: disc;">',
+        '  <ul style="margin: 0; padding: 0; list-style-type: none;">',
         studentRows.join('\n'),
         '  </ul>',
         '</div>'
@@ -842,15 +845,15 @@ function compileStaffDigestHTML(name, praiseCount, mtssCount, isTeacher, activeC
       var mtssClears = [
         "Look at you. Zero outstanding MTSS logs. Go buy yourself a coffee, or take an extra long deep breath. You earned it.",
         "MTSS status: clean. Zero outstanding logs. You are officially an overachiever. Keep it up.",
-        "No outstanding MTSS logs. Denise is happy, you\'re happy, I\'m happy. Well, as happy as code can get. Have a great weekend!",
+        "No outstanding MTSS logs. Denise is happy, you\'re happy, I\'m happy. Well, as happy as code can get. Have a great weekend.",
         "Zero outstanding MTSS logs due. Seriously, teach us your secrets. Have a relaxing weekend."
       ];
       var mtssClearText = mtssClears[Math.floor(Math.random() * mtssClears.length)];
       
       mtssSection = [
-        '<div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 20px; margin-top: 25px;">',
-        '  <h3 style="color: #15803d; margin-top: 0; font-family: Arial, sans-serif; font-size: 13px; text-transform: uppercase; letter-spacing: 1px; font-weight: bold;">✅ MTSS Review Status: Clear</h3>',
-        '  <p style="color: #36506e; font-size: 13px; margin: 0; line-height: 1.6;">',
+        '<div style="background-color: #ffffff; border: 3px solid #16a34a; border-radius: 16px; padding: 25px; margin-top: 25px; box-shadow: 0 6px 16px rgba(22,163,74,0.04); border-top: 8px solid #16a34a;">',
+        '  <h3 style="color: #15803d; margin: 0 0 12px 0; font-family: Arial, sans-serif; font-size: 15px; text-transform: uppercase; letter-spacing: 1px; font-weight: 900;">✅ MTSS Review Status: Clear</h3>',
+        '  <p style="color: #475569; font-size: 13px; margin: 0; line-height: 1.6; font-family: Arial, sans-serif;">',
         '    ' + mtssClearText,
         '  </p>',
         '</div>'
@@ -862,18 +865,18 @@ function compileStaffDigestHTML(name, praiseCount, mtssCount, isTeacher, activeC
   var greetings = [];
   if (praiseCount > 0) {
     greetings = [
-      "Hey " + name + ". Look at that, you made it to Friday. And turns out, people actually noticed you doing great things this week. You received " + praiseCount + " shout-out(s)!",
-      "Well " + name + ", another week down. The good news? You\'ve got some fan mail. " + praiseCount + " shout-out(s), to be exact.",
-      "Hey " + name + ". Grab a coffee and sit down. We compiled your weekly appreciation digest, and you actually did pretty great (+" + (praiseCount * 10) + " points for the " + teacherDept + " department).",
-      "Hey " + name + ". Good news: you got " + praiseCount + " shout-out(s) this week. Bad news: I still don\'t have a coffee for you. But hey, take the win.",
-      "Well, " + name + ", you did it. You survived the week, AND you actually managed to inspire some students. You\'ve got " + praiseCount + " shout-out(s) waiting."
+      "Hey " + name + ". Look at that, you made it to Friday. And turns out, people actually noticed you doing great things this week. You received " + praiseCount + " Shout-Out(s).",
+      "Well " + name + ", another week down. The good news? You\'ve got some fan mail. " + praiseCount + " Shout-Out(s), to be exact.",
+      "Hey " + name + ". Grab a coffee and sit down. We compiled your weekly appreciation digest, and you actually did pretty great (contributing +" + weeklyPoints + " points to the " + teacherDept + " department).",
+      "Hey " + name + ". Good news: you got " + praiseCount + " Shout-Out(s) this week. Bad news: I still don\'t have a coffee for you. But hey, take the win.",
+      "Well, " + name + ", you did it. You survived the week, and you actually managed to inspire some students. You\'ve got " + praiseCount + " Shout-Out(s) waiting."
     ];
   } else {
     greetings = [
-      "Hey " + name + ". You made it to Friday. No specific shout-outs this week, but honestly, just getting to the weekend is a solid accomplishment.",
+      "Hey " + name + ". You made it to Friday. No specific Shout-Outs this week, but honestly, just getting to the weekend is a solid accomplishment.",
       "Well " + name + ", another week down. Quiet on the fan mail front this week, but we still appreciate you keeping the wheels turning.",
-      "Hey " + name + ". Grab a coffee and relax. No shout-outs logged for you this week, but hey, less emails for you to read, right?",
-      "Hey " + name + ". Happy Friday! The universe was quiet on the VSO front for you this week, but your department still needs you."
+      "Hey " + name + ". Grab a coffee and relax. No Shout-Outs logged for you this week, but hey, less emails for you to read.",
+      "Hey " + name + ". Happy Friday. The universe was quiet on the VSO front for you this week, but your department still needs you."
     ];
   }
   var greetingText = greetings[Math.floor(Math.random() * greetings.length)];
@@ -884,26 +887,32 @@ function compileStaffDigestHTML(name, praiseCount, mtssCount, isTeacher, activeC
     var vsoBlocks = [];
     weeklyVSOs.forEach(function(v) {
       vsoBlocks.push(
-        '      <div style="margin-bottom: 14px; padding: 12px 16px; background-color: #fcfaf2; border-left: 4px solid #ffcc04; border-radius: 4px;">',
-        '        <p style="color: #36506e; font-size: 13px; font-style: italic; margin: 0 0 8px 0; line-height: 1.5;">"' + v.message + '"</p>',
+        '      <div style="margin-bottom: 16px; padding: 16px; background-color: #ffffff; border: 1px solid #e2e8f0; border-left: 5px solid #ffcc04; border-radius: 8px; box-shadow: 0 2px 4px rgba(12,35,70,0.01);">',
+        '        <p style="color: #334155; font-size: 13px; font-style: italic; margin: 0 0 8px 0; line-height: 1.5;">"' + v.message + '"</p>',
         '        <p style="color: #0c2346; font-size: 11px; font-weight: bold; margin: 0; text-align: right;">— ' + v.sender + '</p>',
         '      </div>'
       );
     });
     
-    vsoSection = [
-      '<div style="margin-top: 25px; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; background-color: #ffffff; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">',
-      '  <div style="background-color: #0c2346; padding: 12px 18px; border-bottom: 3px solid #ffcc04;">',
-      '    <h3 style="margin: 0; color: #ffffff; font-size: 13px; text-transform: uppercase; letter-spacing: 1px; font-family: Arial, sans-serif; font-weight: bold;">📩 Friday Fan Mail</h3>',
-      '  </div>',
-      '  <div style="padding: 18px; background-color: #ffffff;">',
-      vsoBlocks.join('\n'),
-      '  </div>',
+    var fanMailHeaderHtml = [
+      '<div style="background-color: #0c2346; border-left: 6px solid #ffcc04; padding: 12px 18px; margin-top: 30px; margin-bottom: 15px; text-align: left; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">',
+      '  <h3 style="margin: 0; color: #ffffff; font-size: 20px; font-weight: 900; font-family: Arial, sans-serif; text-transform: uppercase; letter-spacing: 1px; line-height: 1.2;">🏹 Friday Fan Mail</h3>',
       '</div>'
+    ].join('\n');
+
+    vsoSection = [
+      fanMailHeaderHtml,
+      vsoBlocks.join('\n')
     ].join('\n');
   }
 
-  // 2. Build running scoreboard table
+  // 2. Build running scoreboard table with progress bars
+  var maxDeptPoints = 0;
+  sortedDepts.forEach(function(d) {
+    if (d.points > maxDeptPoints) maxDeptPoints = d.points;
+  });
+  if (maxDeptPoints === 0) maxDeptPoints = 100;
+
   var scoreboardRows = [];
   (sortedDepts || []).forEach(function(dept, idx) {
     var rank = idx + 1;
@@ -913,41 +922,51 @@ function compileStaffDigestHTML(name, praiseCount, mtssCount, isTeacher, activeC
     else if (rank === 3) rankStr = "🥉";
     
     var isTeacherDept = dept.name.toLowerCase() === teacherDept.toLowerCase();
-    var rowBg = isTeacherDept ? "background-color: #fefcbf; border-left: 4px solid #ffcc04;" : (idx % 2 === 1 ? "background-color: #f8fafc;" : "background-color: #ffffff;");
-    var rowWeight = isTeacherDept ? "font-weight: bold; color: #0c2346;" : "color: #36506e;";
-    var labelSuffix = isTeacherDept ? ' <span style="font-size: 9px; background-color: #ffcc04; color: #0c2346; padding: 1px 5px; border-radius: 3px; font-weight: bold; margin-left: 4px; text-transform: uppercase; display: inline-block; vertical-align: middle;">You</span>' : "";
+    var barColor = isTeacherDept ? "#ffcc04" : "#0c2346";
+    var rowBg = isTeacherDept ? "#fbf8eb" : "#ffffff";
+    var borderAccent = isTeacherDept ? "3px solid #ffcc04" : "1.5px solid #e2e8f0";
+    var textWeight = isTeacherDept ? "font-weight: 900; color: #0c2346;" : "color: #36506e;";
+    var labelSuffix = isTeacherDept ? ' <span style="font-size: 10px; background-color: #ffcc04; color: #0c2346; padding: 2px 8px; border-radius: 4px; font-weight: 900; margin-left: 8px; text-transform: uppercase; display: inline-block; vertical-align: middle; border: 1.5px solid #0c2346;">🛡️ Your Dept</span>' : "";
+    
+    var pct = Math.round((dept.points / maxDeptPoints) * 100);
+    pct = Math.max(8, Math.min(100, pct));
     
     scoreboardRows.push(
-      '        <tr style="' + rowBg + '">',
-      '          <td style="padding: 8px 10px; text-align: center; ' + rowWeight + '">' + rankStr + '</td>',
-      '          <td style="padding: 8px 10px; ' + rowWeight + '">' + dept.name + labelSuffix + '</td>',
-      '          <td style="padding: 8px 10px; text-align: right; ' + rowWeight + '">' + dept.points + ' pts</td>',
-      '        </tr>'
+      '      <div style="margin-bottom: 12px; padding: 16px; border-radius: 12px; border: ' + borderAccent + '; background-color: ' + rowBg + '; box-shadow: 0 4px 8px rgba(12,35,70,0.02);">',
+      '        <table width="100%" cellpadding="0" cellspacing="0" border="0" style="font-family: Arial, sans-serif;">',
+      '          <tr>',
+      '            <td width="15%" style="font-size: 28px; text-align: center; ' + textWeight + '">' + rankStr + '</td>',
+      '            <td width="60%" style="font-size: 14px; ' + textWeight + '">',
+      '              ' + dept.name + labelSuffix,
+      '            </td>',
+      '            <td width="25%" style="font-size: 14px; text-align: right; ' + textWeight + '">',
+      '              <strong>' + dept.points + '</strong> pts',
+      '            </td>',
+      '          </tr>',
+      '        </table>',
+      '        <div style="margin-top: 10px;">',
+      '          <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #e2e8f0; border-radius: 6px; overflow: hidden; height: 12px;">',
+      '            <tr>',
+      '              <td width="' + pct + '%" style="background-color: ' + barColor + '; height: 12px; border-radius: 6px 0 0 6px;"></td>',
+      '              <td width="' + (100 - pct) + '%" style="height: 12px;"></td>',
+      '            </tr>',
+      '          </table>',
+      '        </div>',
+      '      </div>'
     );
   });
   
+  var scoreboardHeaderHtml = [
+    '<div style="background-color: #0c2346; border-left: 6px solid #ffcc04; padding: 12px 18px; margin-top: 30px; margin-bottom: 15px; text-align: left; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">',
+    '  <h3 style="margin: 0; color: #ffffff; font-size: 20px; font-weight: 900; font-family: Arial, sans-serif; text-transform: uppercase; letter-spacing: 1px; line-height: 1.2;">🏆 Department Standings Scoreboard</h3>',
+    '</div>'
+  ].join('\n');
+
   var scoreboardSection = "";
   if (sortedDepts.length > 0) {
     scoreboardSection = [
-      '<div style="margin-top: 25px; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; background-color: #ffffff; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">',
-      '  <div style="background-color: #0c2346; padding: 12px 18px; border-bottom: 3px solid #ffcc04;">',
-      '    <h3 style="margin: 0; color: #ffffff; font-size: 13px; text-transform: uppercase; letter-spacing: 1px; font-family: Arial, sans-serif; font-weight: bold;">🏆 Department Standings Scoreboard</h3>',
-      '  </div>',
-      '  <div style="padding: 15px; background-color: #ffffff;">',
-      '    <table cellpadding="0" cellspacing="0" border="0" width="100%" style="font-size: 13px; border-collapse: collapse; font-family: Arial, sans-serif;">',
-      '      <thead>',
-      '        <tr style="border-bottom: 2px solid #e2e8f0; text-align: left;">',
-      '          <th style="padding: 6px 10px; font-weight: bold; color: #0c2346; width: 15%; text-align: center;">Rank</th>',
-      '          <th style="padding: 6px 10px; font-weight: bold; color: #0c2346; width: 60%;">Department</th>',
-      '          <th style="padding: 6px 10px; font-weight: bold; color: #0c2346; width: 25%; text-align: right;">Total Points</th>',
-      '        </tr>',
-      '      </thead>',
-      '      <tbody>',
-      scoreboardRows.join('\n'),
-      '      </tbody>',
-      '    </table>',
-      '  </div>',
-      '</div>'
+      scoreboardHeaderHtml,
+      scoreboardRows.join('\n')
     ].join('\n');
   }
 
@@ -956,10 +975,36 @@ function compileStaffDigestHTML(name, praiseCount, mtssCount, isTeacher, activeC
     var slidesUrl = "https://docs.google.com/presentation/d/" + sysConfig.SLIDES_PRESENTATION_ID + "/present?slide=id.p2";
     actionButtonHtml = [
       '      <div style="margin-top: 35px; border-top: 1px solid #e2e8f0; padding-top: 25px; text-align: center;">',
-      '        <a href="' + slidesUrl + '" target="_blank" style="background-color: #0c2346; color: #ffcc04; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 11px; text-transform: uppercase; display: inline-block; border: 2px solid #ffcc04; letter-spacing: 0.5px;">View Hallway TV Slideshow Loop</a>',
+      '        <a href="' + slidesUrl + '" target="_blank" style="background-color: #0c2346; color: #ffffff; padding: 16px 32px; text-decoration: none; border-radius: 8px; font-weight: 900; font-size: 13px; text-transform: uppercase; display: inline-block; border: 3px solid #ffcc04; letter-spacing: 1.5px; width: 90%; max-width: 450px; box-shadow: 0 4px 12px rgba(12,35,70,0.15); font-family: Arial, sans-serif;">📺 View Hallway TV Slideshow Loop</a>',
       '      </div>'
     ].join('\n');
   }
+
+  var dashboardHtml = [
+    '      <!-- Weekly PBIS Staff Dashboard -->',
+    '      <div style="background-color: #ffffff; border: 4px solid #0c2346; border-radius: 16px; padding: 25px; margin-top: 25px; margin-bottom: 25px; box-shadow: 0 8px 24px rgba(12,35,70,0.12); border-top: 10px solid #ffcc04;">',
+    '        <div style="text-align: center; margin-bottom: 20px;">',
+    '          <span style="font-family: Arial, sans-serif; font-size: 14px; font-weight: 900; color: #0c2346; text-transform: uppercase; letter-spacing: 2px; border-bottom: 3px solid #ffcc04; padding-bottom: 6px; display: inline-block;">⚡ Weekly PBIS Staff Dashboard ⚡</span>',
+    '        </div>',
+    '        ',
+    '        <!-- Stats Grid -->',
+    '        <table cellpadding="0" cellspacing="0" border="0" width="100%" style="font-family: Arial, sans-serif;">',
+    '          <tr>',
+    '            <td width="48%" align="center" style="background-color: #f8fafc; border: 2.5px solid #0c2346; border-radius: 12px; padding: 20px 10px; box-shadow: 0 2px 6px rgba(12,35,70,0.03);">',
+    '              <span style="font-size: 38px; display: block; margin-bottom: 6px;">📣</span>',
+    '              <span style="font-size: 44px; font-weight: 900; color: #0c2346; display: block; line-height: 1.1;">' + praiseCount + '</span>',
+    '              <span style="font-size: 10px; text-transform: uppercase; color: #64748b; font-weight: 900; display: block; margin-top: 6px; letter-spacing: 0.5px; line-height: 1.2;">Shout-Outs<br>Received</span>',
+    '            </td>',
+    '            <td width="4%">&nbsp;</td>',
+    '            <td width="48%" align="center" style="background-color: #f8fafc; border: 2.5px solid #0c2346; border-radius: 12px; padding: 20px 10px; box-shadow: 0 2px 6px rgba(12,35,70,0.03);">',
+    '              <span style="font-size: 38px; display: block; margin-bottom: 6px;">⚡</span>',
+    '              <span style="font-size: 44px; font-weight: 900; color: #16a34a; display: block; line-height: 1.1;">+' + weeklyPoints + '</span>',
+    '              <span style="font-size: 10px; text-transform: uppercase; color: #64748b; font-weight: 900; display: block; margin-top: 6px; letter-spacing: 0.5px; line-height: 1.2;">Points Earned<br>For ' + teacherDept + '</span>',
+    '            </td>',
+    '          </tr>',
+    '        </table>',
+    '      </div>'
+  ].join('\n');
 
   var html = [
     '<div style="background-color: #eef2f6; padding: 30px 10px; font-family: Arial, Helvetica, sans-serif;">',
@@ -974,26 +1019,11 @@ function compileStaffDigestHTML(name, praiseCount, mtssCount, isTeacher, activeC
     '      <p style="color: #1e293b; font-size: 15px; margin-top: 0; font-weight: bold; line-height: 1.5;">',
     '        ' + greetingText,
     '      </p>',
-    '      <p style="color: #475569; font-size: 13px; line-height: 1.6;">',
-    '        Here is your weekly summary of the Virtual Shout-Outs (VSOs) and points logged. Students who sent or received a shout-out are eligible to spin the PBIS prize wheel in the commons today (Friday) for some glorious rewards.',
+    '      <p style="color: #475569; font-size: 13px; line-height: 1.6; margin-bottom: 25px;">',
+    '        Here is your weekly summary of the Virtual Shout-Outs (VSOs) and points logged. Students who sent or received a Shout-Out are eligible to spin the PBIS prize wheel in the commons today (Friday) for some glorious rewards.',
     '      </p>',
     '      ',
-    '      <!-- Stats Card Grid -->',
-    '      <table cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-top: 20px; font-family: Arial, sans-serif;">',
-    '        <tr>',
-    '          <td width="48%" style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; text-align: center;">',
-    '            <span style="font-size: 28px; display: block; margin-bottom: 8px;">✉️</span>',
-    '            <span style="font-size: 24px; font-weight: 800; color: #0c2346; display: block;">' + praiseCount + '</span>',
-    '            <span style="font-size: 10px; text-transform: uppercase; color: #64748b; font-weight: bold; display: block; margin-top: 4px; letter-spacing: 0.5px;">Shout-Outs Received</span>',
-    '          </td>',
-    '          <td width="4%">&nbsp;</td>',
-    '          <td width="48%" style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; text-align: center;">',
-    '            <span style="font-size: 28px; display: block; margin-bottom: 8px;">⚡</span>',
-    '            <span style="font-size: 24px; font-weight: 800; color: #36506e; display: block;">+' + (praiseCount * 10) + '</span>',
-    '            <span style="font-size: 10px; text-transform: uppercase; color: #64748b; font-weight: bold; display: block; margin-top: 4px; letter-spacing: 0.5px;">For ' + teacherDept + ' Dept</span>',
-    '          </td>',
-    '        </tr>',
-    '      </table>',
+    '      ' + dashboardHtml,
     '      ',
     '      ' + vsoSection,
     '      ',
@@ -1273,10 +1303,6 @@ function compileStudentDigestHTML(studentName, praiseCount, shoutoutCount, weekl
     '            <td style="padding-bottom: 8px;"><strong>Lock In:</strong> Focus on academic excellence and positive behavior.</td>',
     '          </tr>',
     '        </table>',
-    '        ',
-    '        <p style="margin: 0; font-size: 11px; color: #64748b; font-style: italic; font-family: Arial, sans-serif;">',
-    '          Snarky note: Not the highlight of your week, but certainly better than a poke in the eye.',
-    '        </p>',
     '      </div>'
   ].join('\n');
 
@@ -1297,7 +1323,7 @@ function compileStudentDigestHTML(studentName, praiseCount, shoutoutCount, weekl
     '            </td>',
     '            <td width="5%">&nbsp;</td>',
     '            <td width="30%" align="center" style="background-color: #f8fafc; border: 2.5px solid #0c2346; border-radius: 12px; padding: 20px 10px; box-shadow: 0 2px 6px rgba(12,35,70,0.03);">',
-    '              <span style="font-size: 38px; display: block; margin-bottom: 6px;">📤</span>',
+    '              <span style="font-size: 38px; display: block; margin-bottom: 6px;">✉️</span>',
     '              <span style="font-size: 44px; font-weight: 900; color: #36506e; display: block; line-height: 1.1;">' + shoutoutCount + '</span>',
     '              <span style="font-size: 10px; text-transform: uppercase; color: #64748b; font-weight: 900; display: block; margin-top: 6px; letter-spacing: 0.5px; line-height: 1.2;">Shout-Outs<br>Sent</span>',
     '            </td>',
@@ -1379,14 +1405,46 @@ function compileParentDigestHTML(parentEmail, studentName, receivedPraise, stude
   receivedPraise.forEach(function(v) {
     var categoryLabel = v.category ? v.category : "PBIS";
     praiseBlocks.push(
-      '      <div style="margin-bottom: 20px; padding: 16px; background-color: #fcfaf2; border-left: 4px solid #ffcc04; border-radius: 8px;">',
-      '        <p style="color: #0c2346; font-size: 13px; font-weight: bold; margin: 0 0 8px 0;">🛡️ ' + v.sender + ' said your child deserved the ' + categoryLabel + ' VSO.</p>',
-      '        <div style="padding: 12px 14px; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 13px; color: #334155; font-style: italic; line-height: 1.5;">',
+      '      <div style="margin-bottom: 16px; padding: 16px; background-color: #ffffff; border: 1px solid #e2e8f0; border-left: 5px solid #ffcc04; border-radius: 8px; box-shadow: 0 2px 4px rgba(12,35,70,0.01);">',
+      '        <p style="color: #0c2346; font-size: 13px; font-weight: bold; margin: 0 0 8px 0; font-family: Arial, sans-serif;">🛡️ ' + v.sender + ' said your child deserved the ' + categoryLabel + ' VSO.</p>',
+      '        <div style="padding: 12px 14px; background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 13px; color: #334155; font-style: italic; line-height: 1.5;">',
       '          "' + v.message + '"',
       '        </div>',
       '      </div>'
     );
   });
+
+  var receivedHeaderHtml = [
+    '<div style="background-color: #0c2346; border-left: 6px solid #ffcc04; padding: 12px 18px; margin-top: 30px; margin-bottom: 15px; text-align: left; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">',
+    '  <h3 style="margin: 0; color: #ffffff; font-size: 20px; font-weight: 900; font-family: Arial, sans-serif; text-transform: uppercase; letter-spacing: 1px; line-height: 1.2;">🏹 Shout-Out Details</h3>',
+    '</div>'
+  ].join('\n');
+
+  var receivedSection = "";
+  if (praiseBlocks.length > 0) {
+    receivedSection = [
+      receivedHeaderHtml,
+      praiseBlocks.join('\n')
+    ].join('\n');
+  } else {
+    receivedSection = [
+      receivedHeaderHtml,
+      '      <div style="padding: 16px; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; text-align: center; color: #64748b; font-size: 13px; font-style: italic;">',
+      '        No new Virtual Shout-Outs logged this week.',
+      '      </div>'
+    ].join('\n');
+  }
+
+  var explanationCardHtml = [
+    '      <!-- PBIS Explanation Card -->',
+    '      <div style="background-color: #ffffff; border: 3px solid #0c2346; border-radius: 16px; padding: 22px; margin-top: 25px; box-shadow: 0 6px 16px rgba(12,35,70,0.04); border-top: 8px solid #ffcc04;">',
+    '        <span style="font-size: 32px; display: block; margin-bottom: 8px; text-align: center;">🎁</span>',
+    '        <h4 style="margin: 0 0 12px 0; font-weight: 900; color: #0c2346; font-size: 15px; text-transform: uppercase; letter-spacing: 1px; font-family: Arial, sans-serif; text-align: center;">🎯 About Virtual Shout-Outs</h4>',
+    '        <p style="margin: 0; font-size: 13px; color: #475569; line-height: 1.6; font-family: Arial, sans-serif;">',
+    '          These weekly Virtual Shout-Outs (VSOs) make your child eligible to win PBIS incentives like gift cards or special privileges. They can also earn eligibility through shouting out their teachers and school staff. It\'s sort of like playing catch with a big ball of gratitude-injected sunshine.',
+    '        </p>',
+    '      </div>'
+  ].join('\n');
 
   var html = [
     '<div style="background-color: #eef2f6; padding: 30px 10px; font-family: Arial, Helvetica, sans-serif;">',
@@ -1402,23 +1460,12 @@ function compileParentDigestHTML(parentEmail, studentName, receivedPraise, stude
     '        Dear Parent/Guardian of ' + studentName + ',',
     '      </p>',
     '      <p style="color: #334155; font-size: 14px; line-height: 1.6; font-weight: bold; margin-bottom: 20px;">',
-    '        Your child received Virtual Shout-Out(s) at Copley High School! We can see the pride swelling in you from here! It has to make you think someone\'s doing something right. Keep it up.',
+    '        Your child received Virtual Shout-Out(s) at Copley High School. We can see the pride swelling in you from here. It has to make you think someone\'s doing something right. Keep it up.',
     '      </p>',
     '      ',
-    '      <!-- Praise Slips Received Section -->',
-    '      <div style="margin-top: 25px; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; background-color: #ffffff; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">',
-    '        <div style="background-color: #0c2346; padding: 12px 18px; border-bottom: 3px solid #ffcc04;">',
-    '          <h3 style="margin: 0; color: #ffffff; font-size: 13px; text-transform: uppercase; letter-spacing: 1px; font-family: Arial, sans-serif; font-weight: bold;">🏹 Recognition Praise Details</h3>',
-    '        </div>',
-    '        <div style="padding: 18px; background-color: #ffffff;">',
-    '          ' + (praiseBlocks.length > 0 ? praiseBlocks.join('\n') : '<p style="color: #64748b; font-size: 13px; font-style: italic; margin: 0;">No new praise slips logged this week.</p>'),
-    '        </div>',
-    '      </div>',
+    '      ' + receivedSection,
     '      ',
-    '      <!-- Explanation & Celebration -->',
-    '      <div style="background-color: #fcfaf2; border-left: 4px solid #ffcc04; border-radius: 8px; padding: 16px; margin-top: 25px; font-size: 13px; color: #334155; line-height: 1.6;">',
-    '        These weekly Virtual Shout-Outs (VSOs) make your child eligible to win PBIS incentives like gift cards or special privileges. They can also earn eligibility through shouting out their teachers and school staff. It\'s sort of like playing catch with a big ball of gratitude-injected sunshine.',
-    '      </div>',
+    '      ' + explanationCardHtml,
     '      ',
     '      <p style="color: #475569; font-size: 13px; line-height: 1.6; margin-top: 25px;">',
     '        Thank you for your partnership and support in encouraging excellence at Copley High School. We are incredibly proud of ' + studentName + '\'s contributions to our school community.',

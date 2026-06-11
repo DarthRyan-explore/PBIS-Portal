@@ -565,7 +565,7 @@ else:
     if "Copley_PBIS_Banner_Parent_01.png" not in html or "Dear Parent/Guardian of Frodo Baggins" not in html or "Academic Support" not in html:
         print("❌ Frodo parent email basic structure is malformed.")
         digest_passed = False
-    elif "Your child received Virtual Shout-Out(s) at Copley High School!" not in html or "We can see the pride swelling in you from here!" not in html or "gratitude-injected sunshine" not in html:
+    elif "Your child received Virtual Shout-Out(s) at Copley High School." not in html or "We can see the pride swelling in you from here." not in html or "gratitude-injected sunshine" not in html:
         print("❌ Frodo parent email is missing custom celebratory or gratitude copy.")
         digest_passed = False
     elif "🛡️ Sarah Janiga said your child deserved the Academic Support VSO." not in html:
