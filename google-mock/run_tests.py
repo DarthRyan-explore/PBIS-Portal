@@ -528,11 +528,26 @@ if not frodo_baggins_email:
 else:
     html = frodo_baggins_email["htmlBody"]
     subject = frodo_baggins_email.get("subject", "")
-    if "Copley_PBIS_Banner_Student_01.png" not in html or "Frodo Baggins" not in html or "Praise Slips Received" not in html:
+    
+    valid_received_headers = [
+        "Here's What Staff Said Behind Your Back",
+        "What Staff Are Saying About You",
+        "Staff Shout-Outs",
+        "Good Things Were Said",
+        "Staff Noticed",
+        "Caught Doing Something Right",
+        "What We Heard About You This Week"
+    ]
+    has_received_header = any(hdr in html for hdr in valid_received_headers)
+    
+    if "Copley_PBIS_Banner_Student_01.png" not in html or "Frodo Baggins" not in html or "Weekly PBIS Dashboard" not in html:
         print("❌ Frodo Baggins student email basic structure is malformed.")
         digest_passed = False
-    elif "Lock In for the PBIS Quarterly Parties" not in html or "Send a Shout-Out to a Teacher or Staff Member" not in html:
-        print("❌ Frodo Baggins student email is missing quarterly party promo or shout-out button.")
+    elif not has_received_header:
+        print("❌ Frodo Baggins student email is missing a valid rotating shout-out header.")
+        digest_passed = False
+    elif "PBIS Quarterly Party!" not in html or "Send a Shout-Out to a Teacher or Staff Member" not in html:
+        print("❌ Frodo Baggins student email is missing quarterly party promo card or shout-out button.")
         digest_passed = False
     elif subject != "Weekly PBIS Digest - Student Rewards & Standings 🏹":
         print(f"❌ Frodo Baggins student email has incorrect subject: {subject}")
@@ -571,8 +586,19 @@ if not luke_skywalker_email:
     digest_passed = False
 else:
     html = luke_skywalker_email["htmlBody"]
-    if "Copley_PBIS_Banner_Student_01.png" not in html or "Luke Skywalker" not in html or "Shout-outs Sent to Staff" not in html:
-        print("❌ Luke Skywalker student email is malformed.")
+    
+    valid_sent_headers = [
+        "You Made Someone's Day",
+        "Kind Words You Shared",
+        "Shout-Outs You Sent",
+        "Here's What You Had To Say",
+        "Encouragement You Passed Along",
+        "Positive Vibes Delivered"
+    ]
+    has_sent_header = any(hdr in html for hdr in valid_sent_headers)
+    
+    if "Copley_PBIS_Banner_Student_01.png" not in html or "Luke Skywalker" not in html or not has_sent_header:
+        print("❌ Luke Skywalker student email is malformed or missing rotating sent header.")
         digest_passed = False
     else:
         print("✅ Luke Skywalker student digest verified!")
