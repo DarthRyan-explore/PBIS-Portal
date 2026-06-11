@@ -493,7 +493,7 @@ else:
         print("✅ Tom Wilson dynamic outstanding MTSS warnings verified!")
     
     # Check if the dynamic button links to Google Slides (since SLIDES_PRESENTATION_ID is set in _System_Config)
-    if "https://docs.google.com/presentation/d/mock-slides-id-12345/present?slide=id.p2" not in tom_wilson_email["htmlBody"] or "View Hallway TV Slideshow Loop" not in tom_wilson_email["htmlBody"]:
+    if "https://docs.google.com/presentation/d/mock-slides-id-12345/present?slide=id.p2" not in tom_wilson_email["htmlBody"] or "See What's Scrolling on the Big Screen" not in tom_wilson_email["htmlBody"]:
         print("❌ Tom Wilson digest missing correct dynamic Slides link button with ?slide=id.p2.")
         digest_passed = False
     else:

@@ -975,7 +975,7 @@ function compileStaffDigestHTML(name, praiseCount, mtssCount, isTeacher, activeC
     var slidesUrl = "https://docs.google.com/presentation/d/" + sysConfig.SLIDES_PRESENTATION_ID + "/present?slide=id.p2";
     actionButtonHtml = [
       '      <div style="margin-top: 35px; border-top: 1px solid #e2e8f0; padding-top: 25px; text-align: center;">',
-      '        <a href="' + slidesUrl + '" target="_blank" style="background-color: #0c2346; color: #ffffff; padding: 16px 32px; text-decoration: none; border-radius: 8px; font-weight: 900; font-size: 13px; text-transform: uppercase; display: inline-block; border: 3px solid #ffcc04; letter-spacing: 1.5px; width: 90%; max-width: 450px; box-shadow: 0 4px 12px rgba(12,35,70,0.15); font-family: Arial, sans-serif;">📺 View Hallway TV Slideshow Loop</a>',
+      '        <a href="' + slidesUrl + '" target="_blank" style="background-color: #0c2346; color: #ffffff; padding: 16px 32px; text-decoration: none; border-radius: 8px; font-weight: 900; font-size: 13px; text-transform: uppercase; display: inline-block; border: 3px solid #ffcc04; letter-spacing: 1.5px; width: 90%; max-width: 450px; box-shadow: 0 4px 12px rgba(12,35,70,0.15); font-family: Arial, sans-serif;">📺 See What\'s Scrolling on the Big Screen</a>',
       '      </div>'
     ].join('\n');
   }
@@ -1263,7 +1263,7 @@ function compileStudentDigestHTML(studentName, praiseCount, shoutoutCount, weekl
     var slidesUrl = "https://docs.google.com/presentation/d/" + sysConfig.SLIDES_PRESENTATION_ID + "/present?slide=id.p2";
     actionButtonHtml = [
       '      <div style="margin-top: 35px; border-top: 1px solid #e2e8f0; padding-top: 25px; text-align: center;">',
-      '        <a href="' + slidesUrl + '" target="_blank" style="background-color: #0c2346; color: #ffffff; padding: 16px 32px; text-decoration: none; border-radius: 8px; font-weight: 900; font-size: 13px; text-transform: uppercase; display: inline-block; border: 3px solid #ffcc04; letter-spacing: 1.5px; width: 90%; max-width: 450px; box-shadow: 0 4px 12px rgba(12,35,70,0.15); font-family: Arial, sans-serif;">📺 View Hallway TV Slideshow Loop</a>',
+      '        <a href="' + slidesUrl + '" target="_blank" style="background-color: #0c2346; color: #ffffff; padding: 16px 32px; text-decoration: none; border-radius: 8px; font-weight: 900; font-size: 13px; text-transform: uppercase; display: inline-block; border: 3px solid #ffcc04; letter-spacing: 1.5px; width: 90%; max-width: 450px; box-shadow: 0 4px 12px rgba(12,35,70,0.15); font-family: Arial, sans-serif;">📺 See What\'s Scrolling on the Big Screen</a>',
       '      </div>'
     ].join('\n');
   }
@@ -1416,7 +1416,7 @@ function compileParentDigestHTML(parentEmail, studentName, receivedPraise, stude
 
   var receivedHeaderHtml = [
     '<div style="background-color: #0c2346; border-left: 6px solid #ffcc04; padding: 12px 18px; margin-top: 30px; margin-bottom: 15px; text-align: left; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">',
-    '  <h3 style="margin: 0; color: #ffffff; font-size: 20px; font-weight: 900; font-family: Arial, sans-serif; text-transform: uppercase; letter-spacing: 1px; line-height: 1.2;">🏹 Shout-Out Details</h3>',
+    '  <h3 style="margin: 0; color: #ffffff; font-size: 20px; font-weight: 900; font-family: Arial, sans-serif; text-transform: uppercase; letter-spacing: 1px; line-height: 1.2;">🏹 What Staff Said About Your Child</h3>',
     '</div>'
   ].join('\n');
 
