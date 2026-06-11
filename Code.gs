@@ -117,6 +117,7 @@ function processShoutoutSubmission(values, isStaffForm, sheet) {
   var writeInIdx = isStaffForm ? 7 : -1;
   var messageIdx = isStaffForm ? -1 : 6;
   var nameIdx = -1;
+  var consentIdx = -1;
   
   if (headers && headers.length > 0) {
     for (var c = 0; c < headers.length; c++) {
@@ -143,6 +144,8 @@ function processShoutoutSubmission(values, isStaffForm, sheet) {
         targetIdx = c;
       } else if (h.indexOf("name") !== -1) {
         nameIdx = c;
+      } else if (isStaffForm && (h.indexOf("consent") !== -1 || h.indexOf("screen") !== -1 || h.indexOf("display") !== -1 || h.indexOf("public") !== -1)) {
+        consentIdx = c;
       }
     }
   }
@@ -179,6 +182,14 @@ function processShoutoutSubmission(values, isStaffForm, sheet) {
   } else {
     message = (messageIdx !== -1 && values[messageIdx]) ? values[messageIdx].toString().trim() : "";
     isAnonymous = (anonymousIdx !== -1 && values[anonymousIdx]) ? values[anonymousIdx].toString().toLowerCase() === "yes" : false;
+  }
+  
+  var consentVal = "Yes";
+  var isConsentNo = false;
+  if (isStaffForm && consentIdx !== -1 && values[consentIdx]) {
+    var rawConsent = values[consentIdx].toString().trim();
+    isConsentNo = rawConsent.toLowerCase().indexOf("no") !== -1 && rawConsent.toLowerCase().indexOf("yes") === -1;
+    consentVal = isConsentNo ? "No" : "Yes";
   }
   
   Logger.log("Processing Shout-out from " + sender + " (" + email + ") to " + teacher + " (isStaffForm=" + isStaffForm + ")");
@@ -227,7 +238,7 @@ function processShoutoutSubmission(values, isStaffForm, sheet) {
       status = "Approved";
       auditedBy = "Auto-Approved (Staff)";
       auditDate = new Date();
-      featureOnTv = false; // Kept unchecked by default to prevent TV flooding!
+      featureOnTv = isConsentNo ? "No Consent" : false; // Force "No Consent" if teacher opted out!
       Logger.log("Staff-to-Student VSO detected. Recipient: " + teacher + " (" + house + ") gets " + points + " house points (Auto-Approved).");
     } else {
       // Security warning: Student tried to spoof the staff form!
@@ -253,8 +264,10 @@ function processShoutoutSubmission(values, isStaffForm, sheet) {
   var modSheet = ss.getSheetByName(CONFIG.MODERATION_SHEET_NAME);
   if (!modSheet) {
     modSheet = ss.insertSheet(CONFIG.MODERATION_SHEET_NAME);
-    modSheet.appendRow(["Timestamp", "Sender", "House", "Target Staff", "Category", "Message", "Anonymous", "Status", "Audited By", "Audit Date", "Feature on TV?"]);
-    modSheet.getRange(1, 1, 1, 11).setFontWeight("bold").setBackground("#0c2346").setFontColor("#ffcc04");
+    modSheet.appendRow(["Timestamp", "Sender", "House", "Target Staff", "Category", "Message", "Anonymous", "Status", "Audited By", "Audit Date", "Feature on TV?", "Big Screen Consent"]);
+    modSheet.getRange(1, 1, 1, 12).setFontWeight("bold").setBackground("#0c2346").setFontColor("#ffcc04");
+  } else if (modSheet.getLastColumn() < 12) {
+    modSheet.getRange(1, 12).setValue("Big Screen Consent").setFontWeight("bold").setBackground("#0c2346").setFontColor("#ffcc04");
   }
   
   modSheet.appendRow([
@@ -268,7 +281,8 @@ function processShoutoutSubmission(values, isStaffForm, sheet) {
     status,
     auditedBy,
     auditDate,
-    featureOnTv
+    featureOnTv,
+    consentVal
   ]);
   
   Logger.log("Successfully routed shout-out to Moderation Queue.");
@@ -1806,6 +1820,7 @@ function updateFeaturedShoutOutSlides(presentationId, limit, filterDirection) {
     var statusColIdx = 7;
     var auditedByColIdx = 8;
     var featureColIdx = -1;
+    var consentColIdx = -1;
     
     for (var c = 0; c < headers.length; c++) {
       var hName = headers[c] ? headers[c].toString().toLowerCase().trim() : "";
@@ -1827,6 +1842,8 @@ function updateFeaturedShoutOutSlides(presentationId, limit, filterDirection) {
         }
       } else if (hName.indexOf("feature") !== -1 || hName.indexOf("tv") !== -1) {
         featureColIdx = c;
+      } else if (hName.indexOf("consent") !== -1 || hName.indexOf("screen") !== -1 || hName.indexOf("agree") !== -1) {
+        consentColIdx = c;
       }
     }
     
@@ -1841,7 +1858,15 @@ function updateFeaturedShoutOutSlides(presentationId, limit, filterDirection) {
         isFeatured = (featVal === "yes" || featVal === "true" || featVal === "1" || data[i][featureColIdx] === true);
       }
       
-      if (status.toLowerCase() === "approved" && isFeatured) {
+      var hasConsent = true;
+      if (consentColIdx !== -1 && data[i][consentColIdx] !== undefined) {
+        var consentVal = data[i][consentColIdx].toString().trim().toLowerCase();
+        if (consentVal.indexOf("no") !== -1 && consentVal.indexOf("yes") === -1) {
+          hasConsent = false;
+        }
+      }
+      
+      if (status.toLowerCase() === "approved" && isFeatured && hasConsent) {
         var senderName = data[i][senderColIdx] || "Anonymous";
         var receiverName = data[i][targetColIdx] || "Recipient";
         

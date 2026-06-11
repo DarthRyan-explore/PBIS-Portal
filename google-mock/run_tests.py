@@ -620,7 +620,7 @@ var mockSheets = {
     ["House Name", "Total Points", "Last Updated"]
   ],
   "GenYES_Moderation_Queue": [
-    ["Timestamp", "Sender", "House", "Target Staff", "Category", "Message", "Anonymous", "Status", "Audited By", "Audit Date", "Feature on TV?"]
+    ["Timestamp", "Sender", "House", "Target Staff", "Category", "Message", "Anonymous", "Status", "Audited By", "Audit Date", "Feature on TV?", "Big Screen Consent"]
   ],
   "Staff_Directory": [
     ["Last Name", "First Name", "Staff Classification", "Department / Specific Role", "Email"],
@@ -639,7 +639,7 @@ var mockSheets = {
     ["Timestamp", "Email Address", "First Name", "Last Name", "Which staff member/teacher are you shouting out?", "Category", "Appreciation Message", "Anonymous"]
   ],
   "Form Responses 2": [
-    ["Timestamp", "Email Address", "First Name", "Last Name", "Which student are you shouting out?", "Category", "Quick Pick", "Write-in"]
+    ["Timestamp", "Email Address", "First Name", "Last Name", "Which student are you shouting out?", "Category", "Quick Pick", "Write-in", "Is it okay to display this Shout-Out on the big screen in the commons?"]
   ]
 };
 
@@ -652,6 +652,9 @@ var SpreadsheetApp = {
         }
         return {
           getName: function() { return name; },
+          getLastColumn: function() {
+            return mockSheets[name] && mockSheets[name].length > 0 ? mockSheets[name][0].length : 0;
+          },
           getDataRange: function() {
             return {
               getValues: function() { return mockSheets[name]; }
@@ -661,18 +664,23 @@ var SpreadsheetApp = {
             mockSheets[name].push(row);
           },
           getRange: function(row, col) {
-            return {
+            var rangeObj = {
               setValue: function(val) {
                 if (!mockSheets[name][row - 1]) {
                   mockSheets[name][row - 1] = [];
                 }
                 mockSheets[name][row - 1][col - 1] = val;
+                return rangeObj;
               },
               getValue: function() {
                 if (!mockSheets[name][row - 1]) return "";
                 return mockSheets[name][row - 1][col - 1];
-              }
+              },
+              setFontWeight: function(w) { return rangeObj; },
+              setBackground: function(b) { return rangeObj; },
+              setFontColor: function(c) { return rangeObj; }
             };
+            return rangeObj;
           }
         };
       },
@@ -680,6 +688,9 @@ var SpreadsheetApp = {
         return Object.keys(mockSheets).map(function(n) {
           return {
             getName: function() { return n; },
+            getLastColumn: function() {
+              return mockSheets[n] && mockSheets[n].length > 0 ? mockSheets[n][0].length : 0;
+            },
             getDataRange: function() {
               return { getValues: function() { return mockSheets[n]; } };
             }
@@ -733,7 +744,7 @@ function runTest4() {
     "No"
   ], false);
   
-  // Test 2: Staff-to-Student submission (praise)
+  // Test 2: Staff-to-Student submission (praise - Consent = Yes)
   processShoutoutSubmission([
     "2026-06-10 12:05:00",
     "sarah.janiga@copley-fairlawn.org",
@@ -742,7 +753,8 @@ function runTest4() {
     "Ahsoka Tano",
     "Academic Excellence",
     "", // quick pick
-    "Fantastic math work!" // write-in
+    "Fantastic math work!", // write-in
+    "Yes, let's celebrate them publicly!"
   ], true);
   
   // Test 3: Spoof attempt by student on staff form (security gate test)
@@ -754,11 +766,25 @@ function runTest4() {
     "Ahsoka Tano",
     "Academic Excellence",
     "", // quick pick
-    "Spoofed VSO!" // write-in
+    "Spoofed VSO!", // write-in
+    "Yes, let's celebrate them publicly!"
   ], true);
   
-  // Set first approved & featured, fourth not featured (Luke Skywalker index 4 now)
-  // Format of GenYES queue: Timestamp, Sender, House, Target Staff, Category, Message, Anonymous, Status, Audited By, Audit Date, Feature on TV?
+  // Test 5: Staff-to-Student submission (praise - Consent = No)
+  processShoutoutSubmission([
+    "2026-06-10 12:20:00",
+    "sarah.janiga@copley-fairlawn.org",
+    "Sarah",
+    "Janiga",
+    "Ahsoka Tano",
+    "Academic Excellence",
+    "", // quick pick
+    "Private feedback note.", // write-in
+    "No, keep this praise private between us."
+  ], true);
+  
+  // Set first approved & featured, fourth not featured (Luke Skywalker index 5 now)
+  // Format of GenYES queue: Timestamp, Sender, House, Target Staff, Category, Message, Anonymous, Status, Audited By, Audit Date, Feature on TV?, Big Screen Consent
   mockSheets["GenYES_Moderation_Queue"][1][7] = "Approved"; // Frodo (Student VSO needs manual approval)
   mockSheets["GenYES_Moderation_Queue"][1][10] = true;      // Feature on TV
   
@@ -768,7 +794,10 @@ function runTest4() {
     mockSheets["GenYES_Moderation_Queue"][2][10] = true;
   }
   
-  // Append a non-featured approved row to test exclusion (index 4)
+  // For Test 5 (index 4 in GenYES moderation queue), try to feature it on TV to verify that it is still blocked
+  mockSheets["GenYES_Moderation_Queue"][4][10] = true; // Attempt to feature even though Consent = No
+  
+  // Append a non-featured approved row to test exclusion (index 5)
   mockSheets["GenYES_Moderation_Queue"].push([
     "2026-06-10 12:10:00",
     "Luke Skywalker",
@@ -780,7 +809,8 @@ function runTest4() {
     "Approved",
     "GenYES Operator",
     new Date(),
-    false // Feature on TV false
+    false, // Feature on TV false
+    "Yes"
   ]);
   
   // Reset counters before final manual sync to only count the second sync
@@ -837,11 +867,11 @@ if seniors_pts != 2:
 else:
     print("✅ Student-to-staff resolved points (2 points to Seniors) verified!")
 
-if juniors_pts != 10:
-    print(f"❌ Staff-to-student routing score mismatch. Expected Juniors: 10, Got: {juniors_pts}")
+if juniors_pts != 20:
+    print(f"❌ Staff-to-student routing score mismatch. Expected Juniors: 20, Got: {juniors_pts}")
     t4_passed = False
 else:
-    print("✅ Staff-to-student resolved points (10 points to Juniors) verified!")
+    print("✅ Staff-to-student resolved points (20 points to Juniors) verified!")
 
 # 2. Slide count verification
 # 2 slides should be generated (Luke Skywalker is excluded since Feature on TV is false)
@@ -905,6 +935,21 @@ if spoof_status != "Rejected" or spoof_auditor != "System Security (Unauthorized
     t4_passed = False
 else:
     print("✅ Student spoofing attempt on staff form successfully blocked and logged as Rejected!")
+
+# 6. Big Screen Consent Gate Verification
+consent_yes_row = test_4_results["queue"][2]
+consent_no_row = test_4_results["queue"][4]
+consent_yes_val = consent_yes_row[11] if len(consent_yes_row) > 11 else ""
+consent_no_val = consent_no_row[11] if len(consent_no_row) > 11 else ""
+
+if consent_yes_val != "Yes":
+    print(f"❌ Big Screen Consent Yes check failed. Expected: Yes, Got: {consent_yes_val}")
+    t4_passed = False
+elif consent_no_val != "No":
+    print(f"❌ Big Screen Consent No check failed. Expected: No, Got: {consent_no_val}")
+    t4_passed = False
+else:
+    print("✅ Big Screen Consent columns resolved and stored correctly!")
 
 if t4_passed:
     print("\n✨ TEST CASE 4 PASSED! Routing, slide sync checkboxes, and placeholder logic are perfect.")
