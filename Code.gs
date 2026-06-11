@@ -361,47 +361,53 @@ function sendWeeklyDigest() {
   var sysConfig = getSystemConfig();
   
   // 1. Gather stats from sheets
-  var shoutoutSheet = ss.getSheetByName(CONFIG.SHOUTOUT_FORM_SHEET_NAME);
+  var modSheet = ss.getSheetByName(CONFIG.MODERATION_SHEET_NAME);
   var mtssSheet = ss.getSheetByName(CONFIG.MTSS_SHEET_NAME);
   
-  if (!shoutoutSheet) {
-    Logger.log("Shout-out response sheet not found. Skipping digest.");
+  if (!modSheet) {
+    Logger.log("Moderation sheet not found. Skipping digest.");
     return;
   }
   
-  var shoutouts = shoutoutSheet.getDataRange().getValues();
+  var modData = modSheet.getDataRange().getValues();
   var mtssLogs = mtssSheet ? mtssSheet.getDataRange().getValues() : [];
   
-  // Resolve headers to find the Target Teacher column index dynamically
-  var headers = shoutouts[0];
-  var teacherColIdx = -1;
-  var senderColIdx = -1;
-  var msgColIdx = -1;
+  // Resolve headers for Moderation queue dynamically
+  var modHeaders = modData[0];
+  var senderColIdx = 1;
+  var targetColIdx = 3;
+  var categoryColIdx = 4;
+  var messageColIdx = 5;
+  var anonymousColIdx = 6;
+  var statusColIdx = 7;
   
-  for (var c = 0; c < headers.length; c++) {
-    var h = headers[c].toString().toLowerCase().trim();
-    if (h.indexOf("staff") !== -1 || h.indexOf("teacher") !== -1) {
-      teacherColIdx = c;
-    } else if (h.indexOf("first name") !== -1 || h.indexOf("sender") !== -1 || h.indexOf("your name") !== -1) {
+  for (var c = 0; c < modHeaders.length; c++) {
+    var hName = modHeaders[c] ? modHeaders[c].toString().toLowerCase().trim() : "";
+    if (hName === "sender" || hName === "from") {
       senderColIdx = c;
-    } else if (h.indexOf("message") !== -1 || h.indexOf("shoutout") !== -1 || h.indexOf("praise") !== -1) {
-      msgColIdx = c;
+    } else if (hName.indexOf("target") !== -1 || hName === "to" || hName.indexOf("recipient") !== -1) {
+      targetColIdx = c;
+    } else if (hName.indexOf("category") !== -1) {
+      categoryColIdx = c;
+    } else if (hName.indexOf("message") !== -1 || hName.indexOf("shout") !== -1 || hName.indexOf("praise") !== -1) {
+      messageColIdx = c;
+    } else if (hName.indexOf("anonymous") !== -1) {
+      anonymousColIdx = c;
+    } else if (hName.indexOf("status") !== -1) {
+      statusColIdx = c;
     }
   }
-  if (teacherColIdx === -1) teacherColIdx = 4; // Default to Column E (index 4)
-  if (senderColIdx === -1) senderColIdx = 2; // Default fallback
-  if (msgColIdx === -1) msgColIdx = 6;    // Default fallback
   
-  // Filter for records submitted in the last 7 days (for shoutouts received)
   var now = new Date();
   var oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
   
   var weeklyShoutoutsCount = 0;
   
-  // Load staff recipients dynamically from the Staff_Directory sheet tab
+  // Load directories
   var staffRecipients = getStaffDirectory();
+  var studentDirectory = getStudentDirectory();
   
-  // Reset/Initialize weekly counters
+  // Reset/Initialize weekly counters for staff
   for (var name in staffRecipients) {
     staffRecipients[name].received = 0;
   }
@@ -412,28 +418,106 @@ function sendWeeklyDigest() {
     teacherWeeklyVSOs[staffName] = [];
   }
   
-  // Calculate cumulative department points
+  // Student collections
+  var studentWeeklyVSOs = {};
+  var studentSentShoutouts = {};
+
+  // Calculate cumulative department points & parse approved items
   var deptPoints = {};
 
-  for (var i = 1; i < shoutouts.length; i++) {
-    var receiver = shoutouts[i][teacherColIdx] ? shoutouts[i][teacherColIdx].toString().trim() : "";
-    if (receiver && staffRecipients[receiver]) {
-      var dept = staffRecipients[receiver].dept || "General Staff";
+  for (var i = 1; i < modData.length; i++) {
+    var status = modData[i][statusColIdx] ? modData[i][statusColIdx].toString().trim() : "";
+    if (status.toLowerCase() !== "approved") continue;
+    
+    var ts = new Date(modData[i][0]);
+    if (ts < oneWeekAgo) continue;
+    
+    var sender = modData[i][senderColIdx] ? modData[i][senderColIdx].toString().trim() : "Anonymous";
+    var receiver = modData[i][targetColIdx] ? modData[i][targetColIdx].toString().trim() : "";
+    var msg = modData[i][messageColIdx] ? modData[i][messageColIdx].toString().trim() : "";
+    var cat = modData[i][categoryColIdx] ? modData[i][categoryColIdx].toString().trim() : "";
+    var isAnon = modData[i][anonymousColIdx] && modData[i][anonymousColIdx].toString().toLowerCase().trim() === "yes";
+    
+    // Determine type by looking up if sender is in staff directory or has a staff email suffix
+    var isStaffSender = false;
+    for (var staffName in staffRecipients) {
+      if (staffName.toLowerCase().trim() === sender.toLowerCase().trim() || 
+          (staffRecipients[staffName].email && staffRecipients[staffName].email.toLowerCase() === sender.toLowerCase())) {
+        isStaffSender = true;
+        break;
+      }
+    }
+    
+    if (isStaffSender) {
+      // Staff-to-Student Praise Slip
+      weeklyShoutoutsCount++;
+      
+      var displaySenderName = sender;
+      var cleanReceiver = receiver.toLowerCase().trim();
+      var resolvedStudentName = receiver;
+      if (studentDirectory[cleanReceiver]) {
+        resolvedStudentName = studentDirectory[cleanReceiver].fullName;
+      }
+      
+      if (!studentWeeklyVSOs[resolvedStudentName]) {
+        studentWeeklyVSOs[resolvedStudentName] = [];
+      }
+      studentWeeklyVSOs[resolvedStudentName].push({
+        sender: displaySenderName,
+        message: msg,
+        category: cat
+      });
+      
+      var resolvedStaffName = sender;
+      for (var staffName in staffRecipients) {
+        if (staffName.toLowerCase().trim() === sender.toLowerCase().trim()) {
+          resolvedStaffName = staffName;
+          break;
+        }
+      }
+      var dept = staffRecipients[resolvedStaffName] ? (staffRecipients[resolvedStaffName].dept || "General Staff") : "General Staff";
       deptPoints[dept] = (deptPoints[dept] || 0) + 10;
       
-      // Check if submitted in the last 7 days
-      var ts = new Date(shoutouts[i][0]);
-      if (ts >= oneWeekAgo) {
-        weeklyShoutoutsCount++;
-        staffRecipients[receiver].received++;
-        
-        var sender = shoutouts[i][senderColIdx] ? shoutouts[i][senderColIdx].toString().trim() : "Anonymous";
-        var msg = shoutouts[i][msgColIdx] ? shoutouts[i][msgColIdx].toString().trim() : "";
-        var isAnon = shoutouts[i][7] && shoutouts[i][7].toString().toLowerCase().trim() === "yes";
-        if (isAnon) {
-          sender = "Anonymous";
+    } else {
+      // Student-to-Staff Shoutout
+      weeklyShoutoutsCount++;
+      
+      var displaySender = isAnon ? "Anonymous" : sender;
+      var resolvedStaffName = receiver;
+      for (var staffName in staffRecipients) {
+        if (staffName.toLowerCase().trim() === receiver.toLowerCase().trim()) {
+          resolvedStaffName = staffName;
+          break;
         }
-        teacherWeeklyVSOs[receiver].push({ sender: sender, message: msg });
+      }
+      
+      if (staffRecipients[resolvedStaffName]) {
+        staffRecipients[resolvedStaffName].received++;
+        teacherWeeklyVSOs[resolvedStaffName].push({
+          sender: displaySender,
+          message: msg,
+          category: cat
+        });
+        
+        var dept = staffRecipients[resolvedStaffName].dept || "General Staff";
+        deptPoints[dept] = (deptPoints[dept] || 0) + 10;
+      }
+      
+      if (sender && sender.toLowerCase() !== "anonymous" && sender.toLowerCase() !== "anonymous student") {
+        var cleanSender = sender.toLowerCase().trim();
+        var resolvedStudentName = sender;
+        if (studentDirectory[cleanSender]) {
+          resolvedStudentName = studentDirectory[cleanSender].fullName;
+        }
+        
+        if (!studentSentShoutouts[resolvedStudentName]) {
+          studentSentShoutouts[resolvedStudentName] = [];
+        }
+        studentSentShoutouts[resolvedStudentName].push({
+          recipient: resolvedStaffName,
+          message: msg,
+          category: cat
+        });
       }
     }
   }
@@ -494,7 +578,6 @@ function sendWeeklyDigest() {
         activeCount++;
         var cleanStudentName = student.studentName.trim().toLowerCase();
         
-        // Find if they have been logged on/after their caseload start date
         var isLogged = false;
         var startTs = student.startDate ? new Date(student.startDate) : new Date(0);
         
@@ -524,11 +607,8 @@ function sendWeeklyDigest() {
   // Send digests to staff
   for (var staffName in staffRecipients) {
     var stats = staffRecipients[staffName];
-    
-    // Safety check: if they have no email configured, skip
     if (!stats.email) continue;
     
-    // Check if staff classification is Teacher (support staff don't do MTSS strategy reviews)
     var isTeacher = stats.classification ? stats.classification.toLowerCase().indexOf("teacher") !== -1 : true;
     var outstandingList = isTeacher ? (outstandingReminders[staffName] || []) : [];
     var mtssCount = outstandingList.length;
@@ -549,7 +629,7 @@ function sendWeeklyDigest() {
     );
     
     if (CONFIG.DEBUG_MODE) {
-      Logger.log("[DEBUG MODE] Would send email to: " + stats.email + " with Subject: Weekly PBIS Digest (Teacher: " + isTeacher + ")");
+      Logger.log("[DEBUG MODE] Would send email to: " + stats.email + " with Subject: Weekly PBIS Digest (Staff Copy)");
     } else {
       MailApp.sendEmail({
         to: stats.email,
@@ -560,6 +640,94 @@ function sendWeeklyDigest() {
     }
     
     Logger.log("Processed weekly digest email to " + stats.email);
+  }
+  
+  // 5. Send digests to students and parents
+  var sortedHouses = getHouseStandings(ss);
+  
+  var activeStudents = {};
+  for (var sName in studentWeeklyVSOs) activeStudents[sName] = true;
+  for (var sName in studentSentShoutouts) activeStudents[sName] = true;
+  
+  for (var sName in activeStudents) {
+    var received = studentWeeklyVSOs[sName] || [];
+    var sent = studentSentShoutouts[sName] || [];
+    
+    var cleanName = sName.toLowerCase().trim();
+    var sRecord = studentDirectory[cleanName];
+    
+    var studentEmail = "";
+    var studentHouse = "Freshmen";
+    var parentEmail = "";
+    
+    if (sRecord) {
+      studentEmail = sRecord.email;
+      studentHouse = normalizeGradeToHouse(sRecord.grade);
+      parentEmail = sRecord.parentEmail;
+    } else {
+      studentHouse = STUDENT_HOUSE_MAPPING[sName] || "Freshmen";
+      var nameParts = sName.split(" ");
+      var firstPart = nameParts[0] || "";
+      var lastPart = nameParts.slice(1).join(" ") || "";
+      if (firstPart && lastPart) {
+        studentEmail = (firstPart.charAt(0) + lastPart).toLowerCase().replace(/[^a-z0-9]/g, "") + "@cfcsindians.org";
+      } else {
+        studentEmail = sName.toLowerCase().replace(/[^a-z0-9]/g, "") + "@cfcsindians.org";
+      }
+    }
+    
+    if (!studentEmail) continue;
+    
+    var studentHtml = compileStudentDigestHTML(
+      sName,
+      received.length,
+      sent.length,
+      received,
+      sent,
+      sortedHouses,
+      studentHouse
+    );
+    
+    if (CONFIG.DEBUG_MODE) {
+      Logger.log("[DEBUG MODE] Would send email to: " + studentEmail + " with Subject: Weekly PBIS Digest (Student Copy)");
+    } else {
+      MailApp.sendEmail({
+        to: studentEmail,
+        subject: "Weekly PBIS Digest - Student Rewards & Standings 🏹",
+        htmlBody: studentHtml,
+        name: CONFIG.EMAIL_SENDER_NAME
+      });
+    }
+    
+    Logger.log("Processed weekly digest email to student " + studentEmail);
+    
+    if (received.length > 0 && parentEmail) {
+      var parentEmails = parentEmail.split(/[,;]/);
+      parentEmails.forEach(function(pEmail) {
+        pEmail = pEmail.trim();
+        if (!pEmail) return;
+        
+        var parentHtml = compileParentDigestHTML(
+          pEmail,
+          sName,
+          received,
+          studentHouse
+        );
+        
+        if (CONFIG.DEBUG_MODE) {
+          Logger.log("[DEBUG MODE] Would send email to: " + pEmail + " with Subject: Weekly PBIS Digest (Parent Copy)");
+        } else {
+          MailApp.sendEmail({
+            to: pEmail,
+            subject: "Weekly PBIS Notification - " + sName + "'s Achievements 🏹",
+            htmlBody: parentHtml,
+            name: CONFIG.EMAIL_SENDER_NAME
+          });
+        }
+        
+        Logger.log("Processed weekly digest email to parent " + pEmail);
+      });
+    }
   }
   
   Logger.log("Weekly Digest transmission complete. Total shout-outs parsed: " + weeklyShoutoutsCount);
@@ -785,7 +953,7 @@ function compileStaffDigestHTML(name, praiseCount, mtssCount, isTeacher, activeC
 
   var actionButtonHtml = "";
   if (sysConfig.SLIDES_PRESENTATION_ID && sysConfig.SLIDES_PRESENTATION_ID !== "YOUR_SLIDES_PRESENTATION_ID_HERE" && sysConfig.SLIDES_PRESENTATION_ID !== "") {
-    var slidesUrl = "https://docs.google.com/presentation/d/" + sysConfig.SLIDES_PRESENTATION_ID + "/present";
+    var slidesUrl = "https://docs.google.com/presentation/d/" + sysConfig.SLIDES_PRESENTATION_ID + "/present?slide=id.p2";
     actionButtonHtml = [
       '      <div style="margin-top: 35px; border-top: 1px solid #e2e8f0; padding-top: 25px; text-align: center;">',
       '        <a href="' + slidesUrl + '" target="_blank" style="background-color: #0c2346; color: #ffcc04; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 11px; text-transform: uppercase; display: inline-block; border: 2px solid #ffcc04; letter-spacing: 0.5px;">View Hallway TV Slideshow Loop</a>',
@@ -840,6 +1008,271 @@ function compileStaffDigestHTML(name, praiseCount, mtssCount, isTeacher, activeC
     '    <div style="background-color: #f8fafc; color: #64748b; font-size: 10px; text-align: center; padding: 20px; border-top: 1px solid #e2e8f0; line-height: 1.5;">',
     '      © 2026 Copley-Fairlawn City School District. All rights reserved.<br>',
     '      CONFIDENTIAL: Internal staff report protected under school board policy.',
+    '    </div>',
+    '  </div>',
+    '</div>'
+  ].join('\n');
+
+  return html;
+}
+
+/**
+ * Compiles a beautifully formatted Copley High School HTML newsletter for Students
+ */
+function compileStudentDigestHTML(studentName, praiseCount, shoutoutCount, weeklyVSOs, sentVSOs, sortedHouses, studentHouse) {
+  var weeklyPoints = (praiseCount * 10) + (shoutoutCount * 2);
+  
+  var greetings = [];
+  if (praiseCount > 0) {
+    greetings = [
+      "Hey " + studentName + "! Look at that, you made it to Friday. Turns out, teachers actually noticed you doing awesome things this week. You received " + praiseCount + " praise slip(s)!",
+      "Well " + studentName + ", another week down. Good news: you got some fan mail from staff. " + praiseCount + " praise slip(s), to be exact.",
+      "Hey " + studentName + ". Grab a seat. We compiled your weekly PBIS appreciation report, and you actually did pretty great (contributing +" + weeklyPoints + " points to the " + studentHouse + " House standings!).",
+      "Hey " + studentName + ". Good news: you got " + praiseCount + " praise slip(s) this week. That's a solid win for you and the " + studentHouse + "."
+    ];
+  } else if (shoutoutCount > 0) {
+    greetings = [
+      "Hey " + studentName + ". Happy Friday! You didn't receive any staff praise slips this week, but you contributed +" + weeklyPoints + " points to the " + studentHouse + " by shouting out your teachers. Good karma points resolved!",
+      "Hey " + studentName + ". Thanks for showing some love to the staff this week! You sent " + shoutoutCount + " shout-out(s) and earned +" + weeklyPoints + " points for the " + studentHouse + "."
+    ];
+  } else {
+    greetings = [
+      "Hey " + studentName + ". You made it to Friday! No specific shout-outs or praise slips logged for you this week, but just getting to the weekend is a solid accomplishment.",
+      "Well " + studentName + ", another week down. Quiet on the appreciation front this week, but we still value you keeping the vibe going at Copley!"
+    ];
+  }
+  var greetingText = greetings[Math.floor(Math.random() * greetings.length)];
+
+  var receivedSection = "";
+  if (weeklyVSOs.length > 0) {
+    var praiseBlocks = [];
+    weeklyVSOs.forEach(function(v) {
+      praiseBlocks.push(
+        '      <div style="margin-bottom: 14px; padding: 12px 16px; background-color: #f0fdf4; border-left: 4px solid #16a34a; border-radius: 4px;">',
+        '        <p style="color: #0f2942; font-size: 11px; font-weight: bold; margin: 0 0 6px 0;">🛡️ Received from ' + v.sender + ' (Category: ' + (v.category || "General Praise") + ')</p>',
+        '        <p style="color: #334155; font-size: 13px; font-style: italic; margin: 0; line-height: 1.5;">"' + v.message + '"</p>',
+        '      </div>'
+      );
+    });
+    
+    receivedSection = [
+      '<div style="margin-top: 25px; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; background-color: #ffffff; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">',
+      '  <div style="background-color: #0c2346; padding: 12px 18px; border-bottom: 3px solid #ffcc04;">',
+      '    <h3 style="margin: 0; color: #ffffff; font-size: 13px; text-transform: uppercase; letter-spacing: 1px; font-family: Arial, sans-serif; font-weight: bold;">🏹 Praise Slips Received</h3>',
+      '  </div>',
+      '  <div style="padding: 18px; background-color: #ffffff;">',
+      praiseBlocks.join('\n'),
+      '  </div>',
+      '</div>'
+    ].join('\n');
+  }
+
+  var sentSection = "";
+  if (sentVSOs.length > 0) {
+    var sentBlocks = [];
+    sentVSOs.forEach(function(v) {
+      sentBlocks.push(
+        '      <div style="margin-bottom: 14px; padding: 12px 16px; background-color: #f8fafc; border-left: 4px solid #475569; border-radius: 4px;">',
+        '        <p style="color: #475569; font-size: 11px; font-weight: bold; margin: 0 0 6px 0;">✉️ Sent to ' + v.recipient + ' (Category: ' + (v.category || "General Praise") + ')</p>',
+        '        <p style="color: #334155; font-size: 13px; font-style: italic; margin: 0; line-height: 1.5;">"' + v.message + '"</p>',
+        '      </div>'
+      );
+    });
+    
+    sentSection = [
+      '<div style="margin-top: 25px; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; background-color: #ffffff; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">',
+      '  <div style="background-color: #475569; padding: 12px 18px; border-bottom: 3px solid #cbd5e1;">',
+      '    <h3 style="margin: 0; color: #ffffff; font-size: 13px; text-transform: uppercase; letter-spacing: 1px; font-family: Arial, sans-serif; font-weight: bold;">✉️ Shout-outs Sent to Staff</h3>',
+      '  </div>',
+      '  <div style="padding: 18px; background-color: #ffffff;">',
+      sentBlocks.join('\n'),
+      '  </div>',
+      '</div>'
+    ].join('\n');
+  }
+
+  var scoreboardRows = [];
+  (sortedHouses || []).forEach(function(house, idx) {
+    var rank = idx + 1;
+    var rankStr = rank.toString();
+    if (rank === 1) rankStr = "🥇";
+    else if (rank === 2) rankStr = "🥈";
+    else if (rank === 3) rankStr = "🥉";
+    
+    var isStudentHouse = house.name.toLowerCase() === studentHouse.toLowerCase();
+    var rowBg = isStudentHouse ? "background-color: #fefcbf; border-left: 4px solid #ffcc04;" : (idx % 2 === 1 ? "background-color: #f8fafc;" : "background-color: #ffffff;");
+    var rowWeight = isStudentHouse ? "font-weight: bold; color: #0c2346;" : "color: #36506e;";
+    var labelSuffix = isStudentHouse ? ' <span style="font-size: 9px; background-color: #ffcc04; color: #0c2346; padding: 1px 5px; border-radius: 3px; font-weight: bold; margin-left: 4px; text-transform: uppercase; display: inline-block; vertical-align: middle;">Your House</span>' : "";
+    
+    scoreboardRows.push(
+      '        <tr style="' + rowBg + '">',
+      '          <td style="padding: 8px 10px; text-align: center; ' + rowWeight + '">' + rankStr + '</td>',
+      '          <td style="padding: 8px 10px; ' + rowWeight + '">' + house.name + labelSuffix + '</td>',
+      '          <td style="padding: 8px 10px; text-align: right; ' + rowWeight + '">' + house.points + ' pts</td>',
+      '        </tr>'
+    );
+  });
+  
+  var scoreboardSection = "";
+  if (sortedHouses.length > 0) {
+    scoreboardSection = [
+      '<div style="margin-top: 25px; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; background-color: #ffffff; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">',
+      '  <div style="background-color: #0c2346; padding: 12px 18px; border-bottom: 3px solid #ffcc04;">',
+      '    <h3 style="margin: 0; color: #ffffff; font-size: 13px; text-transform: uppercase; letter-spacing: 1px; font-family: Arial, sans-serif; font-weight: bold;">🏆 House Cup Standings</h3>',
+      '  </div>',
+      '  <div style="padding: 15px; background-color: #ffffff;">',
+      '    <table cellpadding="0" cellspacing="0" border="0" width="100%" style="font-size: 13px; border-collapse: collapse; font-family: Arial, sans-serif;">',
+      '      <thead>',
+      '        <tr style="border-bottom: 2px solid #e2e8f0; text-align: left;">',
+      '          <th style="padding: 6px 10px; font-weight: bold; color: #0c2346; width: 15%; text-align: center;">Rank</th>',
+      '          <th style="padding: 6px 10px; font-weight: bold; color: #0c2346; width: 60%;">House</th>',
+      '          <th style="padding: 6px 10px; font-weight: bold; color: #0c2346; width: 25%; text-align: right;">Total Points</th>',
+      '        </tr>',
+      '      </thead>',
+      '      <tbody>',
+      scoreboardRows.join('\n'),
+      '      </tbody>',
+      '    </table>',
+      '  </div>',
+      '</div>'
+    ].join('\n');
+  }
+
+  var actionButtonHtml = "";
+  var sysConfig = getSystemConfig();
+  if (sysConfig.SLIDES_PRESENTATION_ID && sysConfig.SLIDES_PRESENTATION_ID !== "YOUR_SLIDES_PRESENTATION_ID_HERE" && sysConfig.SLIDES_PRESENTATION_ID !== "") {
+    var slidesUrl = "https://docs.google.com/presentation/d/" + sysConfig.SLIDES_PRESENTATION_ID + "/present?slide=id.p2";
+    actionButtonHtml = [
+      '      <div style="margin-top: 35px; border-top: 1px solid #e2e8f0; padding-top: 25px; text-align: center;">',
+      '        <a href="' + slidesUrl + '" target="_blank" style="background-color: #0c2346; color: #ffcc04; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 11px; text-transform: uppercase; display: inline-block; border: 2px solid #ffcc04; letter-spacing: 0.5px;">View Hallway TV Slideshow Loop</a>',
+      '      </div>'
+    ].join('\n');
+  }
+
+  var html = [
+    '<div style="background-color: #eef2f6; padding: 30px 10px; font-family: Arial, Helvetica, sans-serif;">',
+    '  <div style="max-width: 650px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 12px rgba(12,35,70,0.05); background-color: #ffffff;">',
+    '    <!-- Header Banner -->',
+    '    <div style="background-color: #0c2346; text-align: center; border-bottom: 6px solid #ffcc04; overflow: hidden; padding: 0;">',
+    '      <img src="https://raw.githubusercontent.com/DarthRyan-explore/PBIS-Portal/google-workspace-pivot/assets/Copley_PBIS_Banner_Student_01.png" alt="Copley High School Weekly PBIS Student Report" style="display: block; width: 100%; height: auto; max-width: 650px; margin: 0 auto;" />',
+    '    </div>',
+    '    ',
+    '    <!-- Body -->',
+    '    <div style="padding: 30px 25px; background-color: #ffffff;">',
+    '      <p style="color: #1e293b; font-size: 15px; margin-top: 0; font-weight: bold; line-height: 1.5;">',
+    '        ' + greetingText,
+    '      </p>',
+    '      <p style="color: #475569; font-size: 13px; line-height: 1.6;">',
+    '        Here is your weekly summary of the Virtual Shout-Outs (VSOs) and points logged for the House Cup. Show this email at the physical school PBIS table on Friday to claim your reward spins on the prize wheel!',
+    '      </p>',
+    '      ',
+    '      <!-- Stats Card Grid -->',
+    '      <table cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-top: 20px; font-family: Arial, sans-serif;">',
+    '        <tr>',
+    '          <td width="30%" style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 15px; text-align: center;">',
+    '            <span style="font-size: 24px; display: block; margin-bottom: 4px;">✉️</span>',
+    '            <span style="font-size: 20px; font-weight: 800; color: #0c2346; display: block;">' + praiseCount + '</span>',
+    '            <span style="font-size: 9px; text-transform: uppercase; color: #64748b; font-weight: bold; display: block; margin-top: 4px; letter-spacing: 0.5px;">Praise Received</span>',
+    '          </td>',
+    '          <td width="5%">&nbsp;</td>',
+    '          <td width="30%" style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 15px; text-align: center;">',
+    '            <span style="font-size: 24px; display: block; margin-bottom: 4px;">📤</span>',
+    '            <span style="font-size: 20px; font-weight: 800; color: #475569; display: block;">' + shoutoutCount + '</span>',
+    '            <span style="font-size: 9px; text-transform: uppercase; color: #64748b; font-weight: bold; display: block; margin-top: 4px; letter-spacing: 0.5px;">Shout-outs Sent</span>',
+    '          </td>',
+    '          <td width="5%">&nbsp;</td>',
+    '          <td width="30%" style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 15px; text-align: center;">',
+    '            <span style="font-size: 24px; display: block; margin-bottom: 4px;">⚡</span>',
+    '            <span style="font-size: 20px; font-weight: 800; color: #16a34a; display: block;">+' + weeklyPoints + '</span>',
+    '            <span style="font-size: 9px; text-transform: uppercase; color: #64748b; font-weight: bold; display: block; margin-top: 4px; letter-spacing: 0.5px;">Earned for ' + studentHouse + '</span>',
+    '          </td>',
+    '        </tr>',
+    '      </table>',
+    '      ',
+    '      ' + receivedSection,
+    '      ',
+    '      ' + sentSection,
+    '      ',
+    '      ' + scoreboardSection,
+    '      ',
+    actionButtonHtml,
+    '    </div>',
+    '    ',
+    '    <!-- Footer -->',
+    '    <div style="background-color: #f8fafc; color: #64748b; font-size: 10px; text-align: center; padding: 20px; border-top: 1px solid #e2e8f0; line-height: 1.5;">',
+    '      © 2026 Copley-Fairlawn City School District. All rights reserved.<br>',
+    '      This email is sent to your official student account to summarize your PBIS records.',
+    '    </div>',
+    '  </div>',
+    '</div>'
+  ].join('\n');
+
+  return html;
+}
+
+/**
+ * Compiles a beautifully formatted Copley High School HTML newsletter for Parents
+ */
+function compileParentDigestHTML(parentEmail, studentName, receivedPraise, studentHouse) {
+  var praiseCount = receivedPraise.length;
+  var weeklyPoints = praiseCount * 10;
+  
+  var praiseBlocks = [];
+  receivedPraise.forEach(function(v) {
+    praiseBlocks.push(
+      '      <div style="margin-bottom: 14px; padding: 12px 16px; background-color: #fcfaf2; border-left: 4px solid #ffcc04; border-radius: 4px;">',
+      '        <p style="color: #0c2346; font-size: 11px; font-weight: bold; margin: 0 0 6px 0;">🛡️ Recognized by ' + v.sender + ' (Category: ' + (v.category || "General Praise") + ')</p>',
+      '        <p style="color: #334155; font-size: 13px; font-style: italic; margin: 0; line-height: 1.5;">"' + v.message + '"</p>',
+      '      </div>'
+    );
+  });
+
+  var html = [
+    '<div style="background-color: #eef2f6; padding: 30px 10px; font-family: Arial, Helvetica, sans-serif;">',
+    '  <div style="max-width: 650px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 12px rgba(12,35,70,0.05); background-color: #ffffff;">',
+    '    <!-- Header Banner -->',
+    '    <div style="background-color: #0c2346; text-align: center; border-bottom: 6px solid #ffcc04; overflow: hidden; padding: 0;">',
+    '      <img src="https://raw.githubusercontent.com/DarthRyan-explore/PBIS-Portal/google-workspace-pivot/assets/Copley_PBIS_Banner_Parent_01.png" alt="Copley High School Weekly PBIS Parent Report" style="display: block; width: 100%; height: auto; max-width: 650px; margin: 0 auto;" />',
+    '    </div>',
+    '    ',
+    '    <!-- Body -->',
+    '    <div style="padding: 30px 25px; background-color: #ffffff;">',
+    '      <p style="color: #0c2346; font-size: 15px; margin-top: 0; font-weight: bold; line-height: 1.5;">',
+    '        Dear Parent/Guardian of ' + studentName + ',',
+    '      </p>',
+    '      <p style="color: #334155; font-size: 13px; line-height: 1.6;">',
+    '        We are thrilled to share that <strong>' + studentName + '</strong> was recognized this week for demonstrating positive behavior, leadership, or academic excellence at Copley High School!',
+    '      </p>',
+    '      <p style="color: #334155; font-size: 13px; line-height: 1.6;">',
+    '        Each recognition awards points to their grade-level House Cup standings, and qualifies them for weekly rewards in our PBIS Commons reward loop.',
+    '      </p>',
+    '      ',
+    '      <!-- Praise Slips Received Section -->',
+    '      <div style="margin-top: 25px; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; background-color: #ffffff; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">',
+    '        <div style="background-color: #0c2346; padding: 12px 18px; border-bottom: 3px solid #ffcc04;">',
+    '          <h3 style="margin: 0; color: #ffffff; font-size: 13px; text-transform: uppercase; letter-spacing: 1px; font-family: Arial, sans-serif; font-weight: bold;">🏹 Recognition Praise Details</h3>',
+    '        </div>',
+    '        <div style="padding: 18px; background-color: #ffffff;">',
+    '          ' + (praiseBlocks.length > 0 ? praiseBlocks.join('\n') : '<p style="color: #64748b; font-size: 13px; font-style: italic; margin: 0;">No new praise slips logged this week.</p>'),
+    '        </div>',
+    '      </div>',
+    '      ',
+    '      <!-- Points Impact Summary Card -->',
+    '      <div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 20px; margin-top: 25px; text-align: center;">',
+    '        <span style="font-size: 28px; display: block; margin-bottom: 8px;">🌟</span>',
+    '        <span style="font-size: 18px; font-weight: 850; color: #168a42; display: block;">+' + weeklyPoints + ' House Cup Points Added!</span>',
+    '        <span style="font-size: 12px; color: #3f6212; display: block; margin-top: 4px;">These points have been credited directly to the <strong>' + studentHouse + '</strong> House standings!</span>',
+    '      </div>',
+    '      ',
+    '      <p style="color: #475569; font-size: 13px; line-height: 1.6; margin-top: 25px;">',
+    '        Thank you for your partnership and support in encouraging excellence at Copley High School. We are incredibly proud of ' + studentName + '\'s contributions to our school community.',
+    '      </p>',
+    '    </div>',
+    '    ',
+    '    <!-- Footer -->',
+    '    <div style="background-color: #f8fafc; color: #64748b; font-size: 10px; text-align: center; padding: 20px; border-top: 1px solid #e2e8f0; line-height: 1.5;">',
+    '      © 2026 Copley-Fairlawn City School District. All rights reserved.<br>',
+    '      This email is sent to parent/guardian contact accounts registered with the district.',
     '    </div>',
     '  </div>',
     '</div>'
@@ -1574,6 +2007,100 @@ function getStaffDirectory() {
   }
   
   return staff;
+}
+
+/**
+ * Loads student roster and parent contacts from the "Master_Roster" sheet tab.
+ * Resolves column positions dynamically.
+ * @returns {Object} Student records keyed by lowercase full name.
+ */
+function getStudentDirectory() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var rosterSheet = ss.getSheetByName("Master_Roster");
+  var studentDir = {};
+  
+  if (!rosterSheet) {
+    Logger.log("Master_Roster sheet tab not found. Using fallbacks.");
+    return studentDir;
+  }
+  
+  var data = rosterSheet.getDataRange().getValues();
+  if (data.length <= 1) return studentDir;
+  
+  var headers = data[0];
+  var firstCol = -1;
+  var lastCol = -1;
+  var emailCol = -1;
+  var gradeCol = -1;
+  var parentEmailCol = -1;
+  
+  for (var c = 0; c < headers.length; c++) {
+    var h = headers[c].toString().toLowerCase().trim();
+    if (h.indexOf("first") !== -1) firstCol = c;
+    else if (h.indexOf("last") !== -1) lastCol = c;
+    else if (h.indexOf("parent") !== -1 && h.indexOf("email") !== -1) parentEmailCol = c;
+    else if (h.indexOf("email") !== -1) emailCol = c;
+    else if (h.indexOf("grade") !== -1 || h.indexOf("house") !== -1 || h.indexOf("class") !== -1) gradeCol = c;
+  }
+  
+  // Fallbacks if not detected
+  if (firstCol === -1) firstCol = 0;
+  if (lastCol === -1) lastCol = 1;
+  if (emailCol === -1) emailCol = 2;
+  if (gradeCol === -1) gradeCol = 3;
+  
+  for (var r = 1; r < data.length; r++) {
+    var fName = data[r][firstCol] ? data[r][firstCol].toString().trim() : "";
+    var lName = data[r][lastCol] ? data[r][lastCol].toString().trim() : "";
+    var fullName = (fName + " " + lName).trim().toLowerCase().replace(/\s+/g, " ");
+    var email = data[r][emailCol] ? data[r][emailCol].toString().trim() : "";
+    var grade = data[r][gradeCol] ? data[r][gradeCol].toString().trim() : "";
+    var parentEmail = parentEmailCol !== -1 && data[r][parentEmailCol] ? data[r][parentEmailCol].toString().trim() : "";
+    
+    if (fullName) {
+      studentDir[fullName] = {
+        firstName: fName,
+        lastName: lName,
+        fullName: fName + " " + lName,
+        email: email,
+        grade: grade,
+        parentEmail: parentEmail
+      };
+    }
+  }
+  
+  return studentDir;
+}
+
+/**
+ * Calculates current House standings sorted by total points.
+ */
+function getHouseStandings(ss) {
+  var houseScores = {
+    "Seniors": 0,
+    "Juniors": 0,
+    "Sophomores": 0,
+    "Freshmen": 0
+  };
+  
+  var ledgerSheet = ss.getSheetByName(CONFIG.LEDGER_SHEET_NAME);
+  if (ledgerSheet) {
+    var ledgerData = ledgerSheet.getDataRange().getValues();
+    for (var i = 1; i < ledgerData.length; i++) {
+      var houseName = ledgerData[i][0] ? ledgerData[i][0].toString().trim() : "";
+      var points = parseFloat(ledgerData[i][1]) || 0;
+      if (houseName && houseScores[houseName] !== undefined) {
+        houseScores[houseName] = points;
+      }
+    }
+  }
+  
+  var sorted = [];
+  for (var name in houseScores) {
+    sorted.push({ name: name, points: houseScores[name] });
+  }
+  sorted.sort(function(a, b) { return b.points - a.points; });
+  return sorted;
 }
 
 /**

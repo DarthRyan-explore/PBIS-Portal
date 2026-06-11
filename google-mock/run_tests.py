@@ -358,7 +358,6 @@ var mockSheets = {{
   ],
   "MTSS_Interventions_Log": [
     ["Timestamp", "Email", "Student First", "Student Last", "Interventions", "Notes"],
-    // Frodo Baggins check-in logged this week by Sarah Janiga
     [new Date(), "sarah.janiga@copley-fairlawn.org", "Frodo", "Baggins", "Learning Lab", "Checked in"]
   ],
   "Staff_Directory": [
@@ -366,6 +365,23 @@ var mockSheets = {{
     ["Wilson", "Tom", "Teacher", "English", "tom.wilson@copley-fairlawn.org"],
     ["Janiga", "Sarah", "Teacher", "Science", "sarah.janiga@copley-fairlawn.org"],
     ["Gray", "Amy", "Support Staff", "Counseling", "amy.gray@copley-fairlawn.org"]
+  ],
+  "GenYES_Moderation_Queue": [
+    ["Timestamp", "Sender", "House", "Target Staff", "Category", "Message", "Anonymous", "Status", "Audited By", "Audit Date", "Feature on TV?"],
+    [new Date(), "Luke Skywalker", "Sophomores", "Sarah Janiga", "GOAT VSO", "Great teacher!", "No", "Approved", "GenYES Operator", new Date(), "Yes"],
+    [new Date(), "Sarah Janiga", "Seniors", "Frodo Baggins", "Academic Support", "Frodo is making great progress!", "No", "Approved", "Auto-Approved (Staff)", new Date(), "No"]
+  ],
+  "Master_Roster": [
+    ["First Name", "Last Name", "Email", "Grade", "Parent Email"],
+    ["Frodo", "Baggins", "frodo.b@cfcsindians.org", "Senior", "parent.baggins@example.com"],
+    ["Luke", "Skywalker", "luke.s@cfcsindians.org", "Sophomore", ""]
+  ],
+  "House_Cup_Totals": [
+    ["House Name", "Total Points", "Last Updated"],
+    ["Seniors", 120, new Date()],
+    ["Juniors", 90, new Date()],
+    ["Sophomores", 80, new Date()],
+    ["Freshmen", 60, new Date()]
   ]
 }};
 
@@ -446,6 +462,9 @@ digest_passed = True
 tom_wilson_email = None
 sarah_janiga_email = None
 amy_gray_email = None
+frodo_baggins_email = None
+frodo_parent_email = None
+luke_skywalker_email = None
 
 for email in emails_sent:
     if email["to"] == "tom.wilson@copley-fairlawn.org":
@@ -454,6 +473,12 @@ for email in emails_sent:
         sarah_janiga_email = email
     elif email["to"] == "amy.gray@copley-fairlawn.org":
         amy_gray_email = email
+    elif email["to"] == "frodo.b@cfcsindians.org":
+        frodo_baggins_email = email
+    elif email["to"] == "parent.baggins@example.com":
+        frodo_parent_email = email
+    elif email["to"] == "luke.s@cfcsindians.org":
+        luke_skywalker_email = email
 
 # Tom Wilson: Luke Skywalker Active but not logged -> outstanding 1. Is Teacher -> shows warning
 if not tom_wilson_email:
@@ -468,8 +493,8 @@ else:
         print("✅ Tom Wilson dynamic outstanding MTSS warnings verified!")
     
     # Check if the dynamic button links to Google Slides (since SLIDES_PRESENTATION_ID is set in _System_Config)
-    if "https://docs.google.com/presentation/d/mock-slides-id-12345/present" not in tom_wilson_email["htmlBody"] or "View Hallway TV Slideshow Loop" not in tom_wilson_email["htmlBody"]:
-        print("❌ Tom Wilson digest missing correct dynamic Slides link button.")
+    if "https://docs.google.com/presentation/d/mock-slides-id-12345/present?slide=id.p2" not in tom_wilson_email["htmlBody"] or "View Hallway TV Slideshow Loop" not in tom_wilson_email["htmlBody"]:
+        print("❌ Tom Wilson digest missing correct dynamic Slides link button with ?slide=id.p2.")
         digest_passed = False
     else:
         print("✅ Tom Wilson dynamic Slides link button verified!")
@@ -495,6 +520,39 @@ else:
         digest_passed = False
     else:
         print("✅ Amy Gray support classification exemption verified!")
+
+# Frodo Baggins: Student Digest
+if not frodo_baggins_email:
+    print("❌ Frodo Baggins student email not sent.")
+    digest_passed = False
+else:
+    if "Copley_PBIS_Banner_Student_01.png" not in frodo_baggins_email["htmlBody"] or "Frodo Baggins" not in frodo_baggins_email["htmlBody"] or "Praise Slips Received" not in frodo_baggins_email["htmlBody"]:
+        print("❌ Frodo Baggins student email is malformed.")
+        digest_passed = False
+    else:
+        print("✅ Frodo Baggins student digest verified!")
+
+# Frodo parent: Parent Digest
+if not frodo_parent_email:
+    print("❌ Frodo parent email not sent.")
+    digest_passed = False
+else:
+    if "Copley_PBIS_Banner_Parent_01.png" not in frodo_parent_email["htmlBody"] or "Dear Parent/Guardian of Frodo Baggins" not in frodo_parent_email["htmlBody"] or "Academic Support" not in frodo_parent_email["htmlBody"]:
+        print("❌ Frodo parent email is malformed.")
+        digest_passed = False
+    else:
+        print("✅ Frodo parent digest verified!")
+
+# Luke Skywalker: Student Digest (sent shoutouts)
+if not luke_skywalker_email:
+    print("❌ Luke Skywalker student email not sent.")
+    digest_passed = False
+else:
+    if "Copley_PBIS_Banner_Student_01.png" not in luke_skywalker_email["htmlBody"] or "Luke Skywalker" not in luke_skywalker_email["htmlBody"] or "Shout-outs Sent to Staff" not in luke_skywalker_email["htmlBody"]:
+        print("❌ Luke Skywalker student email is malformed.")
+        digest_passed = False
+    else:
+        print("✅ Luke Skywalker student digest verified!")
 
 if digest_passed:
     print("\n✨ TEST CASE 3 PASSED! Dynamic weekly digests resolved correctly.")
