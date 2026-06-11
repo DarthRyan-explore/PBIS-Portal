@@ -526,8 +526,16 @@ if not frodo_baggins_email:
     print("❌ Frodo Baggins student email not sent.")
     digest_passed = False
 else:
-    if "Copley_PBIS_Banner_Student_01.png" not in frodo_baggins_email["htmlBody"] or "Frodo Baggins" not in frodo_baggins_email["htmlBody"] or "Praise Slips Received" not in frodo_baggins_email["htmlBody"]:
-        print("❌ Frodo Baggins student email is malformed.")
+    html = frodo_baggins_email["htmlBody"]
+    subject = frodo_baggins_email.get("subject", "")
+    if "Copley_PBIS_Banner_Student_01.png" not in html or "Frodo Baggins" not in html or "Praise Slips Received" not in html:
+        print("❌ Frodo Baggins student email basic structure is malformed.")
+        digest_passed = False
+    elif "Lock In for the PBIS Quarterly Parties" not in html or "Send a Shout-Out to a Teacher or Staff Member" not in html:
+        print("❌ Frodo Baggins student email is missing quarterly party promo or shout-out button.")
+        digest_passed = False
+    elif subject != "Weekly PBIS Digest - Student Rewards & Standings 🏹":
+        print(f"❌ Frodo Baggins student email has incorrect subject: {subject}")
         digest_passed = False
     else:
         print("✅ Frodo Baggins student digest verified!")
@@ -537,8 +545,22 @@ if not frodo_parent_email:
     print("❌ Frodo parent email not sent.")
     digest_passed = False
 else:
-    if "Copley_PBIS_Banner_Parent_01.png" not in frodo_parent_email["htmlBody"] or "Dear Parent/Guardian of Frodo Baggins" not in frodo_parent_email["htmlBody"] or "Academic Support" not in frodo_parent_email["htmlBody"]:
-        print("❌ Frodo parent email is malformed.")
+    html = frodo_parent_email["htmlBody"]
+    subject = frodo_parent_email.get("subject", "")
+    if "Copley_PBIS_Banner_Parent_01.png" not in html or "Dear Parent/Guardian of Frodo Baggins" not in html or "Academic Support" not in html:
+        print("❌ Frodo parent email basic structure is malformed.")
+        digest_passed = False
+    elif "Your child received Virtual Shout-Out(s) at Copley High School!" not in html or "We can see the pride swelling in you from here!" not in html or "gratitude-injected sunshine" not in html:
+        print("❌ Frodo parent email is missing custom celebratory or gratitude copy.")
+        digest_passed = False
+    elif "🛡️ Sarah Janiga said your child deserved the Academic Support VSO." not in html:
+        print("❌ Frodo parent email does not match custom praise slip format.")
+        digest_passed = False
+    elif "House Cup Standings" in html or "Total Points" in html or "Rank" in html:
+        print("❌ Frodo parent email contains unauthorized House Cup scoreboard or points standings.")
+        digest_passed = False
+    elif subject != "Weekly Copley PBIS Update - Frodo Baggins's Achievements This Week 🏹":
+        print(f"❌ Frodo parent email has incorrect subject: {subject}")
         digest_passed = False
     else:
         print("✅ Frodo parent digest verified!")
@@ -548,7 +570,8 @@ if not luke_skywalker_email:
     print("❌ Luke Skywalker student email not sent.")
     digest_passed = False
 else:
-    if "Copley_PBIS_Banner_Student_01.png" not in luke_skywalker_email["htmlBody"] or "Luke Skywalker" not in luke_skywalker_email["htmlBody"] or "Shout-outs Sent to Staff" not in luke_skywalker_email["htmlBody"]:
+    html = luke_skywalker_email["htmlBody"]
+    if "Copley_PBIS_Banner_Student_01.png" not in html or "Luke Skywalker" not in html or "Shout-outs Sent to Staff" not in html:
         print("❌ Luke Skywalker student email is malformed.")
         digest_passed = False
     else:

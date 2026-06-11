@@ -715,11 +715,11 @@ function sendWeeklyDigest() {
         );
         
         if (CONFIG.DEBUG_MODE) {
-          Logger.log("[DEBUG MODE] Would send email to: " + pEmail + " with Subject: Weekly PBIS Digest (Parent Copy)");
+          Logger.log("[DEBUG MODE] Would send email to: " + pEmail + " with Subject: Weekly Copley PBIS Update - " + sName + "'s Achievements This Week 🏹");
         } else {
           MailApp.sendEmail({
             to: pEmail,
-            subject: "Weekly PBIS Notification - " + sName + "'s Achievements 🏹",
+            subject: "Weekly Copley PBIS Update - " + sName + "'s Achievements This Week 🏹",
             htmlBody: parentHtml,
             name: CONFIG.EMAIL_SENDER_NAME
           });
@@ -1149,12 +1149,29 @@ function compileStudentDigestHTML(studentName, praiseCount, shoutoutCount, weekl
     ].join('\n');
   }
 
+  var studentShoutoutUrl = sysConfig.STUDENT_SHOUTOUT_FORM_URL || "https://docs.google.com/forms/d/e/1FAIpQLSdf_student_shoutout_form_placeholder/viewform";
+  var sendShoutoutButtonHtml = [
+    '      <div style="margin-top: 25px; text-align: center;">',
+    '        <a href="' + studentShoutoutUrl + '" target="_blank" style="background-color: #0c2346; color: #ffcc04; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 11px; text-transform: uppercase; display: inline-block; border: 2px solid #ffcc04; letter-spacing: 0.5px; width: 90%; max-width: 400px; box-shadow: 0 2px 4px rgba(12,35,70,0.1);">🏹 Send a Shout-Out to a Teacher or Staff Member</a>',
+    '      </div>'
+  ].join('\n');
+
+  var partyPromoCardHtml = [
+    '      <!-- PBIS Quarterly Parties Promo -->',
+    '      <div style="background-color: #f8fafc; border: 1px solid #cbd5e1; border-radius: 12px; padding: 20px; margin-top: 25px; font-size: 13px; color: #475569; line-height: 1.6; box-shadow: 0 2px 4px rgba(0,0,0,0.01);">',
+    '        <h4 style="margin: 0 0 8px 0; font-weight: bold; color: #0c2346; font-size: 14px;">🎉 Lock In for the PBIS Quarterly Parties!</h4>',
+    '        <p style="margin: 0;">',
+    '          Even though the world may not always reward good things for those who are doing the right thing, Copley PBIS is trying to. Do the decent human thing of getting to class, not using personal communication devices (PCDs) during school, and locking in, and you\'ll inevitably find an invite to the PBIS quarterly party. Not the highlight of your week, but certainly better than a poke in the eye.',
+    '        </p>',
+    '      </div>'
+  ].join('\n');
+
   var html = [
     '<div style="background-color: #eef2f6; padding: 30px 10px; font-family: Arial, Helvetica, sans-serif;">',
     '  <div style="max-width: 650px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 12px rgba(12,35,70,0.05); background-color: #ffffff;">',
     '    <!-- Header Banner -->',
     '    <div style="background-color: #0c2346; text-align: center; border-bottom: 6px solid #ffcc04; overflow: hidden; padding: 0;">',
-    '      <img src="https://raw.githubusercontent.com/DarthRyan-explore/PBIS-Portal/google-workspace-pivot/assets/Copley_PBIS_Banner_Student_01.png" alt="Copley High School Weekly PBIS Student Report" style="display: block; width: 100%; height: auto; max-width: 650px; margin: 0 auto;" />',
+    '      <img src="https://raw.githubusercontent.com/DarthRyan-explore/PBIS-Portal/google-workspace-pivot/assets/Copley_PBIS_Banner_Student_01.png?v=3" alt="Copley High School Weekly PBIS Student Report" style="display: block; width: 100%; height: auto; max-width: 650px; margin: 0 auto;" />',
     '    </div>',
     '    ',
     '    <!-- Body -->',
@@ -1189,9 +1206,13 @@ function compileStudentDigestHTML(studentName, praiseCount, shoutoutCount, weekl
     '        </tr>',
     '      </table>',
     '      ',
+    '      ' + sendShoutoutButtonHtml,
+    '      ',
     '      ' + receivedSection,
     '      ',
     '      ' + sentSection,
+    '      ',
+    '      ' + partyPromoCardHtml,
     '      ',
     '      ' + scoreboardSection,
     '      ',
@@ -1214,15 +1235,15 @@ function compileStudentDigestHTML(studentName, praiseCount, shoutoutCount, weekl
  * Compiles a beautifully formatted Copley High School HTML newsletter for Parents
  */
 function compileParentDigestHTML(parentEmail, studentName, receivedPraise, studentHouse) {
-  var praiseCount = receivedPraise.length;
-  var weeklyPoints = praiseCount * 10;
-  
   var praiseBlocks = [];
   receivedPraise.forEach(function(v) {
+    var categoryLabel = v.category ? v.category : "PBIS";
     praiseBlocks.push(
-      '      <div style="margin-bottom: 14px; padding: 12px 16px; background-color: #fcfaf2; border-left: 4px solid #ffcc04; border-radius: 4px;">',
-      '        <p style="color: #0c2346; font-size: 11px; font-weight: bold; margin: 0 0 6px 0;">🛡️ Recognized by ' + v.sender + ' (Category: ' + (v.category || "General Praise") + ')</p>',
-      '        <p style="color: #334155; font-size: 13px; font-style: italic; margin: 0; line-height: 1.5;">"' + v.message + '"</p>',
+      '      <div style="margin-bottom: 20px; padding: 16px; background-color: #fcfaf2; border-left: 4px solid #ffcc04; border-radius: 8px;">',
+      '        <p style="color: #0c2346; font-size: 13px; font-weight: bold; margin: 0 0 8px 0;">🛡️ ' + v.sender + ' said your child deserved the ' + categoryLabel + ' VSO.</p>',
+      '        <div style="padding: 12px 14px; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 13px; color: #334155; font-style: italic; line-height: 1.5;">',
+      '          "' + v.message + '"',
+      '        </div>',
       '      </div>'
     );
   });
@@ -1232,7 +1253,7 @@ function compileParentDigestHTML(parentEmail, studentName, receivedPraise, stude
     '  <div style="max-width: 650px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 12px rgba(12,35,70,0.05); background-color: #ffffff;">',
     '    <!-- Header Banner -->',
     '    <div style="background-color: #0c2346; text-align: center; border-bottom: 6px solid #ffcc04; overflow: hidden; padding: 0;">',
-    '      <img src="https://raw.githubusercontent.com/DarthRyan-explore/PBIS-Portal/google-workspace-pivot/assets/Copley_PBIS_Banner_Parent_01.png" alt="Copley High School Weekly PBIS Parent Report" style="display: block; width: 100%; height: auto; max-width: 650px; margin: 0 auto;" />',
+    '      <img src="https://raw.githubusercontent.com/DarthRyan-explore/PBIS-Portal/google-workspace-pivot/assets/Copley_PBIS_Banner_Parent_01.png?v=3" alt="Copley High School Weekly PBIS Parent Report" style="display: block; width: 100%; height: auto; max-width: 650px; margin: 0 auto;" />',
     '    </div>',
     '    ',
     '    <!-- Body -->',
@@ -1240,11 +1261,8 @@ function compileParentDigestHTML(parentEmail, studentName, receivedPraise, stude
     '      <p style="color: #0c2346; font-size: 15px; margin-top: 0; font-weight: bold; line-height: 1.5;">',
     '        Dear Parent/Guardian of ' + studentName + ',',
     '      </p>',
-    '      <p style="color: #334155; font-size: 13px; line-height: 1.6;">',
-    '        We are thrilled to share that <strong>' + studentName + '</strong> was recognized this week for demonstrating positive behavior, leadership, or academic excellence at Copley High School!',
-    '      </p>',
-    '      <p style="color: #334155; font-size: 13px; line-height: 1.6;">',
-    '        Each recognition awards points to their grade-level House Cup standings, and qualifies them for weekly rewards in our PBIS Commons reward loop.',
+    '      <p style="color: #334155; font-size: 14px; line-height: 1.6; font-weight: bold; margin-bottom: 20px;">',
+    '        Your child received Virtual Shout-Out(s) at Copley High School! We can see the pride swelling in you from here! It has to make you think someone\'s doing something right. Keep it up.',
     '      </p>',
     '      ',
     '      <!-- Praise Slips Received Section -->',
@@ -1257,11 +1275,9 @@ function compileParentDigestHTML(parentEmail, studentName, receivedPraise, stude
     '        </div>',
     '      </div>',
     '      ',
-    '      <!-- Points Impact Summary Card -->',
-    '      <div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 20px; margin-top: 25px; text-align: center;">',
-    '        <span style="font-size: 28px; display: block; margin-bottom: 8px;">🌟</span>',
-    '        <span style="font-size: 18px; font-weight: 850; color: #168a42; display: block;">+' + weeklyPoints + ' House Cup Points Added!</span>',
-    '        <span style="font-size: 12px; color: #3f6212; display: block; margin-top: 4px;">These points have been credited directly to the <strong>' + studentHouse + '</strong> House standings!</span>',
+    '      <!-- Explanation & Celebration -->',
+    '      <div style="background-color: #fcfaf2; border-left: 4px solid #ffcc04; border-radius: 8px; padding: 16px; margin-top: 25px; font-size: 13px; color: #334155; line-height: 1.6;">',
+    '        These weekly Virtual Shout-Outs (VSOs) make your child eligible to win PBIS incentives like gift cards or special privileges. They can also earn eligibility through shouting out their teachers and school staff. It\'s sort of like playing catch with a big ball of gratitude-injected sunshine.',
     '      </div>',
     '      ',
     '      <p style="color: #475569; font-size: 13px; line-height: 1.6; margin-top: 25px;">',
@@ -2154,6 +2170,78 @@ function sendTestDigestToMe() {
 }
 
 /**
+ * Safety preview function. Sends a test copy of the dynamic weekly digest
+ * for students directly to your logged-in Google inbox.
+ */
+function testSendStudentDigest() {
+  var myEmail = Session.getActiveUser().getEmail();
+  Logger.log("Compiling mock student digest for testing...");
+  
+  var mockWeeklyVSOs = [
+    { sender: "Mrs. Mirman", category: "Self-Managed", message: "Great job focusing in class and staying on task this week! Keep it up!" }
+  ];
+  
+  var mockSentVSOs = [
+    { recipient: "Mr. Kenobi", category: "Relationship Skills", message: "Thanks for the feedback on the essay, it really helped." }
+  ];
+  
+  var mockSortedHouses = [
+    { name: "Seniors", points: 140 },
+    { name: "Juniors", points: 110 },
+    { name: "Sophomores", points: 90 },
+    { name: "Freshmen", points: 80 }
+  ];
+  
+  var htmlBody = compileStudentDigestHTML(
+    "Test Student",
+    mockWeeklyVSOs.length,
+    mockSentVSOs.length,
+    mockWeeklyVSOs,
+    mockSentVSOs,
+    mockSortedHouses,
+    "Seniors"
+  );
+  
+  MailApp.sendEmail({
+    to: myEmail,
+    subject: "Weekly PBIS Digest - Student Rewards & Standings 🏹",
+    htmlBody: htmlBody,
+    name: CONFIG.EMAIL_SENDER_NAME
+  });
+  
+  Logger.log("Test student digest email successfully sent to " + myEmail);
+}
+
+/**
+ * Safety preview function. Sends a test copy of the dynamic weekly digest
+ * for parents directly to your logged-in Google inbox.
+ */
+function testSendParentDigest() {
+  var myEmail = Session.getActiveUser().getEmail();
+  Logger.log("Compiling mock parent digest for testing...");
+  
+  var mockWeeklyVSOs = [
+    { sender: "Mrs. Mirman", category: "Self-Managed", message: "Great job focusing in class and staying on task this week! Keep it up!" }
+  ];
+  
+  var htmlBody = compileParentDigestHTML(
+    myEmail,
+    "Test Student",
+    mockWeeklyVSOs,
+    "Seniors"
+  );
+  
+  MailApp.sendEmail({
+    to: myEmail,
+    subject: "Weekly Copley PBIS Update - Test Student's Achievements This Week 🏹",
+    htmlBody: htmlBody,
+    name: CONFIG.EMAIL_SENDER_NAME
+  });
+  
+  Logger.log("Test parent digest email successfully sent to " + myEmail);
+}
+
+/**
  * Compiles and returns secure, public-facing House Cup and Department standing points.
  * Excludes student names, emails, VSO texts, or MTSS comments to ensure FERPA compliance.
  *
@@ -2243,6 +2331,10 @@ function onOpen() {
   ui.createMenu("🏹 PBIS Admin")
     .addItem("Sync Hallway TV Slides", "triggerSlidesSyncManual")
     .addItem("Send Friday Staff Digests Now", "sendWeeklyDigest")
+    .addSeparator()
+    .addItem("Preview Staff Digest Email", "sendTestDigestToMe")
+    .addItem("Preview Student Digest Email", "testSendStudentDigest")
+    .addItem("Preview Parent Digest Email", "testSendParentDigest")
     .addSeparator()
     .addItem("Trigger Setup Guide / Diagnostics", "showTriggerSetupGuide")
     .addToUi();
