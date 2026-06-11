@@ -1058,7 +1058,7 @@ function compileStudentDigestHTML(studentName, praiseCount, shoutoutCount, weekl
     }
   }
   
-  var eligibilityStatus = "Eligible";
+  var eligibilityStatus = (praiseCount > 0 || shoutoutCount > 0) ? "Eligible" : "Spin to Earn";
 
   var receivedHeaders = [
     "Here's What Staff Said Behind Your Back",
@@ -1081,13 +1081,41 @@ function compileStudentDigestHTML(studentName, praiseCount, shoutoutCount, weekl
   ];
   var sentHeader = sentHeaders[Math.floor(Math.random() * sentHeaders.length)];
 
+  // Branded Divider Accent
+  var spearDividerHtml = [
+    '      <!-- Branded Spear Divider -->',
+    '      <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 25px 0;">',
+    '        <tr>',
+    '          <td style="border-bottom: 3px solid #0c2346; height: 1px;"></td>',
+    '          <td width="30" align="center" style="font-size: 18px; color: #ffcc04; line-height: 1; padding: 0 10px;">🏹</td>',
+    '          <td style="border-bottom: 3px solid #0c2346; height: 1px;"></td>',
+    '        </tr>',
+    '      </table>'
+  ].join('\n');
+
+  // Low-density quick scan introduction inside a styled card
+  var introListHtml = [
+    '      <div style="background-color: #f8fafc; border: 1.5px solid #cbd5e1; border-radius: 12px; padding: 18px; margin: 15px 0 25px 0; font-family: Arial, sans-serif; font-size: 13px; color: #475569; line-height: 1.6;">',
+    '        <table width="100%" cellpadding="0" cellspacing="0" border="0">',
+    '          <tr>',
+    '            <td width="28" valign="top" style="font-size: 16px; color: #0c2346; padding-bottom: 10px;">🏹</td>',
+    '            <td style="padding-bottom: 10px; color: #1e293b; font-weight: bold;">Here is your weekly summary of the Virtual Shout-Outs (VSOs) and points logged for the House Cup.</td>',
+    '          </tr>',
+    '          <tr>',
+    '            <td width="28" valign="top" style="font-size: 16px; color: #0c2346;">🎡</td>',
+    '            <td style="color: #475569;">Check in at the school PBIS table on Friday to claim your reward spins on the prize wheel.</td>',
+    '          </tr>',
+    '        </table>',
+    '      </div>'
+  ].join('\n');
+
   var receivedSection = "";
   if (weeklyVSOs.length > 0) {
     var praiseBlocks = [];
     weeklyVSOs.forEach(function(v) {
       var categoryLabel = v.category ? v.category : "PBIS";
       praiseBlocks.push(
-        '      <div style="margin-bottom: 16px; padding: 16px; background-color: #ffffff; border: 1px solid #e2e8f0; border-left: 4px solid #ffcc04; border-radius: 8px; box-shadow: 0 2px 4px rgba(12,35,70,0.01);">',
+        '      <div style="margin-bottom: 16px; padding: 16px; background-color: #ffffff; border: 1px solid #e2e8f0; border-left: 5px solid #ffcc04; border-radius: 8px; box-shadow: 0 2px 4px rgba(12,35,70,0.01);">',
         '        <p style="color: #0c2346; font-size: 13px; font-weight: bold; margin: 0 0 8px 0; font-family: Arial, sans-serif;">🛡️ Received from ' + v.sender + ' • ' + categoryLabel + '</p>',
         '        <div style="padding: 12px; background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 13px; color: #334155; font-style: italic; line-height: 1.5;">',
         '          "' + v.message + '"',
@@ -1096,11 +1124,15 @@ function compileStudentDigestHTML(studentName, praiseCount, shoutoutCount, weekl
       );
     });
     
-    receivedSection = [
-      '<div style="margin-top: 25px; background-color: #ffffff; border: 1px solid #e2e8f0; border-top: 4px solid #ffcc04; border-radius: 12px; padding: 20px; box-shadow: 0 4px 6px rgba(12,35,70,0.02);">',
-      '  <h3 style="margin: 0 0 15px 0; color: #0c2346; font-size: 15px; font-weight: 800; font-family: Arial, sans-serif; text-transform: uppercase; letter-spacing: 0.5px;">📣 ' + receivedHeader + '</h3>',
-      praiseBlocks.join('\n'),
+    var receivedHeaderHtml = [
+      '<div style="background-color: #0c2346; border-left: 6px solid #ffcc04; padding: 12px 18px; margin-top: 30px; margin-bottom: 15px; text-align: left; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">',
+      '  <h3 style="margin: 0; color: #ffffff; font-size: 20px; font-weight: 900; font-family: Arial, sans-serif; text-transform: uppercase; letter-spacing: 1px; line-height: 1.2;">🏹 ' + receivedHeader + '</h3>',
       '</div>'
+    ].join('\n');
+
+    receivedSection = [
+      receivedHeaderHtml,
+      praiseBlocks.join('\n')
     ].join('\n');
   }
 
@@ -1110,8 +1142,8 @@ function compileStudentDigestHTML(studentName, praiseCount, shoutoutCount, weekl
     sentVSOs.forEach(function(v) {
       var categoryLabel = v.category ? v.category : "PBIS";
       sentBlocks.push(
-        '      <div style="margin-bottom: 16px; padding: 16px; background-color: #ffffff; border: 1px solid #e2e8f0; border-left: 4px solid #0c2346; border-radius: 8px; box-shadow: 0 2px 4px rgba(12,35,70,0.01);">',
-        '        <p style="color: #475569; font-size: 13px; font-weight: bold; margin: 0 0 8px 0; font-family: Arial, sans-serif;">✉️ Sent to ' + v.recipient + ' • ' + categoryLabel + '</p>',
+        '      <div style="margin-bottom: 16px; padding: 16px; background-color: #ffffff; border: 1px solid #e2e8f0; border-left: 5px solid #0c2346; border-radius: 8px; box-shadow: 0 2px 4px rgba(12,35,70,0.01);">',
+        '        <p style="color: #475569; font-size: 13px; font-weight: bold; margin: 0 0 8px 0; font-family: Arial, sans-serif;">🛡️ Sent to ' + v.recipient + ' • ' + categoryLabel + '</p>',
         '        <div style="padding: 12px; background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 13px; color: #334155; font-style: italic; line-height: 1.5;">',
         '          "' + v.message + '"',
         '        </div>',
@@ -1119,11 +1151,15 @@ function compileStudentDigestHTML(studentName, praiseCount, shoutoutCount, weekl
       );
     });
     
-    sentSection = [
-      '<div style="margin-top: 25px; background-color: #ffffff; border: 1px solid #e2e8f0; border-top: 4px solid #cbd5e1; border-radius: 12px; padding: 20px; box-shadow: 0 4px 6px rgba(12,35,70,0.02);">',
-      '  <h3 style="margin: 0 0 15px 0; color: #475569; font-size: 15px; font-weight: 800; font-family: Arial, sans-serif; text-transform: uppercase; letter-spacing: 0.5px;">✉️ ' + sentHeader + '</h3>',
-      sentBlocks.join('\n'),
+    var sentHeaderHtml = [
+      '<div style="background-color: #0c2346; border-left: 6px solid #ffcc04; padding: 12px 18px; margin-top: 30px; margin-bottom: 15px; text-align: left; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">',
+      '  <h3 style="margin: 0; color: #ffffff; font-size: 20px; font-weight: 900; font-family: Arial, sans-serif; text-transform: uppercase; letter-spacing: 1px; line-height: 1.2;">🏹 ' + sentHeader + '</h3>',
       '</div>'
+    ].join('\n');
+
+    sentSection = [
+      sentHeaderHtml,
+      sentBlocks.join('\n')
     ].join('\n');
   }
 
@@ -1144,32 +1180,32 @@ function compileStudentDigestHTML(studentName, praiseCount, shoutoutCount, weekl
     var isStudentHouse = house.name.toLowerCase() === studentHouse.toLowerCase();
     
     var barColor = isStudentHouse ? "#ffcc04" : "#0c2346";
-    var rowBg = isStudentHouse ? "#fcfaf2" : "#ffffff";
-    var borderAccent = isStudentHouse ? "2px solid #ffcc04" : "1px solid #e2e8f0";
-    var textWeight = isStudentHouse ? "font-weight: bold; color: #0c2346;" : "color: #36506e;";
-    var labelSuffix = isStudentHouse ? ' <span style="font-size: 9px; background-color: #ffcc04; color: #0c2346; padding: 2px 6px; border-radius: 4px; font-weight: bold; margin-left: 6px; text-transform: uppercase; display: inline-block; vertical-align: middle;">Your House</span>' : "";
+    var rowBg = isStudentHouse ? "#fbf8eb" : "#ffffff";
+    var borderAccent = isStudentHouse ? "3px solid #ffcc04" : "1.5px solid #e2e8f0";
+    var textWeight = isStudentHouse ? "font-weight: 900; color: #0c2346;" : "color: #36506e;";
+    var labelSuffix = isStudentHouse ? ' <span style="font-size: 10px; background-color: #ffcc04; color: #0c2346; padding: 2px 8px; border-radius: 4px; font-weight: 900; margin-left: 8px; text-transform: uppercase; display: inline-block; vertical-align: middle; border: 1.5px solid #0c2346;">🛡️ Your House</span>' : "";
     
     var pct = Math.round((house.points / maxPoints) * 100);
     pct = Math.max(8, Math.min(100, pct));
     
     scoreboardRows.push(
-      '      <div style="margin-bottom: 12px; padding: 14px; border-radius: 10px; border: ' + borderAccent + '; background-color: ' + rowBg + '; box-shadow: 0 2px 4px rgba(12,35,70,0.01);">',
+      '      <div style="margin-bottom: 12px; padding: 16px; border-radius: 12px; border: ' + borderAccent + '; background-color: ' + rowBg + '; box-shadow: 0 4px 8px rgba(12,35,70,0.02);">',
       '        <table width="100%" cellpadding="0" cellspacing="0" border="0" style="font-family: Arial, sans-serif;">',
       '          <tr>',
-      '            <td width="10%" style="font-size: 18px; text-align: center; ' + textWeight + '">' + rankStr + '</td>',
-      '            <td width="65%" style="font-size: 13px; ' + textWeight + '">',
+      '            <td width="15%" style="font-size: 28px; text-align: center; ' + textWeight + '">' + rankStr + '</td>',
+      '            <td width="60%" style="font-size: 14px; ' + textWeight + '">',
       '              ' + house.name + labelSuffix,
       '            </td>',
-      '            <td width="25%" style="font-size: 13px; text-align: right; ' + textWeight + '">',
-      '              ' + house.points + ' pts',
+      '            <td width="25%" style="font-size: 14px; text-align: right; ' + textWeight + '">',
+      '              <strong>' + house.points + '</strong> pts',
       '            </td>',
       '          </tr>',
       '        </table>',
-      '        <div style="margin-top: 8px;">',
-      '          <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #e2e8f0; border-radius: 4px; overflow: hidden; height: 8px;">',
+      '        <div style="margin-top: 10px;">',
+      '          <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #e2e8f0; border-radius: 6px; overflow: hidden; height: 12px;">',
       '            <tr>',
-      '              <td width="' + pct + '%" style="background-color: ' + barColor + '; height: 8px; border-radius: 4px 0 0 4px;"></td>',
-      '              <td width="' + (100 - pct) + '%" style="height: 8px;"></td>',
+      '              <td width="' + pct + '%" style="background-color: ' + barColor + '; height: 12px; border-radius: 6px 0 0 6px;"></td>',
+      '              <td width="' + (100 - pct) + '%" style="height: 12px;"></td>',
       '            </tr>',
       '          </table>',
       '        </div>',
@@ -1177,13 +1213,17 @@ function compileStudentDigestHTML(studentName, praiseCount, shoutoutCount, weekl
     );
   });
   
+  var scoreboardHeaderHtml = [
+    '<div style="background-color: #0c2346; border-left: 6px solid #ffcc04; padding: 12px 18px; margin-top: 30px; margin-bottom: 15px; text-align: left; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">',
+    '  <h3 style="margin: 0; color: #ffffff; font-size: 20px; font-weight: 900; font-family: Arial, sans-serif; text-transform: uppercase; letter-spacing: 1px; line-height: 1.2;">🏆 House Cup Standings</h3>',
+    '</div>'
+  ].join('\n');
+
   var scoreboardSection = "";
   if (sortedHouses.length > 0) {
     scoreboardSection = [
-      '<div style="margin-top: 25px; background-color: #ffffff; border: 1px solid #e2e8f0; border-top: 4px solid #0c2346; border-radius: 12px; padding: 20px; box-shadow: 0 4px 6px rgba(12,35,70,0.02);">',
-      '  <h3 style="margin: 0 0 15px 0; color: #0c2346; font-size: 15px; font-weight: 800; font-family: Arial, sans-serif; text-transform: uppercase; letter-spacing: 0.5px;">🏆 House Cup Standings</h3>',
-      scoreboardRows.join('\n'),
-      '</div>'
+      scoreboardHeaderHtml,
+      scoreboardRows.join('\n')
     ].join('\n');
   }
 
@@ -1193,7 +1233,7 @@ function compileStudentDigestHTML(studentName, praiseCount, shoutoutCount, weekl
     var slidesUrl = "https://docs.google.com/presentation/d/" + sysConfig.SLIDES_PRESENTATION_ID + "/present?slide=id.p2";
     actionButtonHtml = [
       '      <div style="margin-top: 35px; border-top: 1px solid #e2e8f0; padding-top: 25px; text-align: center;">',
-      '        <a href="' + slidesUrl + '" target="_blank" style="background-color: #0c2346; color: #ffcc04; padding: 16px 32px; text-decoration: none; border-radius: 12px; font-weight: bold; font-size: 13px; text-transform: uppercase; display: inline-block; border: 2px solid #ffcc04; letter-spacing: 1px; width: 90%; max-width: 450px; box-shadow: 0 4px 10px rgba(12,35,70,0.15); font-family: Arial, sans-serif;">📺 View Hallway TV Slideshow Loop</a>',
+      '        <a href="' + slidesUrl + '" target="_blank" style="background-color: #0c2346; color: #ffffff; padding: 16px 32px; text-decoration: none; border-radius: 8px; font-weight: 900; font-size: 13px; text-transform: uppercase; display: inline-block; border: 3px solid #ffcc04; letter-spacing: 1.5px; width: 90%; max-width: 450px; box-shadow: 0 4px 12px rgba(12,35,70,0.15); font-family: Arial, sans-serif;">📺 View Hallway TV Slideshow Loop</a>',
       '      </div>'
     ].join('\n');
   }
@@ -1201,69 +1241,88 @@ function compileStudentDigestHTML(studentName, praiseCount, shoutoutCount, weekl
   var studentShoutoutUrl = sysConfig.STUDENT_SHOUTOUT_FORM_URL || "https://docs.google.com/forms/d/e/1FAIpQLSdf_student_shoutout_form_placeholder/viewform";
   var sendShoutoutButtonHtml = [
     '      <div style="margin-top: 25px; text-align: center;">',
-    '        <a href="' + studentShoutoutUrl + '" target="_blank" style="background-color: #ffcc04; color: #0c2346; padding: 16px 32px; text-decoration: none; border-radius: 12px; font-weight: bold; font-size: 13px; text-transform: uppercase; display: inline-block; border: 2px solid #0c2346; letter-spacing: 1px; width: 90%; max-width: 450px; box-shadow: 0 4px 10px rgba(255,204,4,0.3); font-family: Arial, sans-serif;">🏹 Send a Shout-Out to a Teacher or Staff Member</a>',
+    '        <a href="' + studentShoutoutUrl + '" target="_blank" style="background-color: #0c2346; color: #ffffff; padding: 16px 32px; text-decoration: none; border-radius: 8px; font-weight: 900; font-size: 13px; text-transform: uppercase; display: inline-block; border: 3px solid #ffcc04; letter-spacing: 1.5px; width: 90%; max-width: 450px; box-shadow: 0 4px 12px rgba(12,35,70,0.2); font-family: Arial, sans-serif;">🏹 Send a Shout-Out to a Teacher or Staff Member</a>',
     '      </div>'
   ].join('\n');
 
   var partyPromoCardHtml = [
     '      <!-- PBIS Quarterly Parties Incentive Card -->',
-    '      <div style="background-color: #ffffff; border: 2px dashed #0c2346; border-radius: 16px; padding: 25px; margin-top: 25px; text-align: center; box-shadow: 0 4px 10px rgba(12,35,70,0.03);">',
+    '      <div style="background-color: #ffffff; border: 3px solid #0c2346; border-radius: 16px; padding: 25px; margin-top: 25px; text-align: center; box-shadow: 0 6px 16px rgba(12,35,70,0.06); border-top: 8px solid #ffcc04;">',
     '        <span style="font-size: 32px; display: block; margin-bottom: 8px;">🎁</span>',
-    '        <h4 style="margin: 0 0 6px 0; font-weight: bold; color: #0c2346; font-size: 15px; text-transform: uppercase; letter-spacing: 0.5px; font-family: Arial, sans-serif;">🎯 Next Target Reward: PBIS Quarterly Party</h4>',
+    '        <h4 style="margin: 0 0 8px 0; font-weight: 900; color: #0c2346; font-size: 16px; text-transform: uppercase; letter-spacing: 1px; font-family: Arial, sans-serif;">🎯 Target Incentive: PBIS Quarterly Party</h4>',
     '        ',
-    '        <div style="display: inline-block; background-color: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 30px; padding: 6px 16px; margin-bottom: 15px; font-size: 11px; font-weight: bold; color: #475569; text-transform: uppercase; letter-spacing: 0.5px;">',
+    '        <div style="display: inline-block; background-color: #f1f5f9; border: 1.5px solid #cbd5e1; border-radius: 30px; padding: 6px 16px; margin-bottom: 18px; font-size: 11px; font-weight: bold; color: #475569; text-transform: uppercase; letter-spacing: 0.5px;">',
     '          🎟️ Quarterly Incentive Details',
     '        </div>',
     '        ',
-    '        <p style="margin: 0 0 18px 0; font-size: 13px; color: #475569; line-height: 1.6; max-width: 500px; margin-left: auto; margin-right: auto; font-family: Arial, sans-serif;">',
-    '          Even though the world may not always reward good things for those who are doing the right thing, Copley PBIS is trying to. Do the decent human thing of getting to class, not using personal communication devices (PCDs) during school, and locking in, and you\'ll inevitably find an invite to the PBIS quarterly party. Not the highlight of your week, but certainly better than a poke in the eye.',
+    '        <p style="margin: 0 0 15px 0; font-size: 13px; color: #475569; line-height: 1.5; font-family: Arial, sans-serif; text-align: left;">',
+    '          Copley PBIS rewards students who do the right thing. To secure your invite to the next quarterly celebration:',
     '        </p>',
     '        ',
-    '        <div style="background-color: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; padding: 10px 14px; font-size: 10px; color: #64748b; text-transform: uppercase; font-weight: bold; letter-spacing: 0.5px; display: inline-block; font-family: Arial, sans-serif;">',
-    '          🎯 How to Earn: Attend Class • Follow PCD Rules • Respect the Vibe',
-    '        </div>',
+    '        <table width="100%" cellpadding="0" cellspacing="0" border="0" style="text-align: left; font-family: Arial, sans-serif; font-size: 13px; color: #334155; margin-bottom: 18px;">',
+    '          <tr>',
+    '            <td width="28" valign="top" style="color: #16a34a; font-weight: 900; font-size: 16px;">✓</td>',
+    '            <td style="padding-bottom: 8px;"><strong>Class Attendance:</strong> Get to class on time and ready to learn.</td>',
+    '          </tr>',
+    '          <tr>',
+    '            <td width="28" valign="top" style="color: #16a34a; font-weight: 900; font-size: 16px;">✓</td>',
+    '            <td style="padding-bottom: 8px;"><strong>Phone Policy:</strong> Avoid personal communication device (PCD) violations.</td>',
+    '          </tr>',
+    '          <tr>',
+    '            <td width="28" valign="top" style="color: #16a34a; font-weight: 900; font-size: 16px;">✓</td>',
+    '            <td style="padding-bottom: 8px;"><strong>Lock In:</strong> Focus on academic excellence and positive behavior.</td>',
+    '          </tr>',
+    '        </table>',
+    '        ',
+    '        <p style="margin: 0; font-size: 11px; color: #64748b; font-style: italic; font-family: Arial, sans-serif;">',
+    '          Snarky note: Not the highlight of your week, but certainly better than a poke in the eye.',
+    '        </p>',
     '      </div>'
   ].join('\n');
 
   var dashboardHtml = [
-    '      <!-- Weekly Dashboard Summary -->',
-    '      <div style="background-color: #ffffff; border: 2px solid #0c2346; border-radius: 16px; padding: 20px; margin-top: 25px; margin-bottom: 25px; box-shadow: 0 4px 12px rgba(12,35,70,0.06);">',
-    '        <h3 style="margin: 0 0 15px 0; color: #0c2346; font-size: 13px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; border-bottom: 2px solid #ffcc04; padding-bottom: 6px; font-family: Arial, sans-serif;">🎯 Weekly PBIS Dashboard</h3>',
+    '      <!-- Weekly PBIS Dashboard -->',
+    '      <div style="background-color: #ffffff; border: 4px solid #0c2346; border-radius: 16px; padding: 25px; margin-top: 25px; margin-bottom: 25px; box-shadow: 0 8px 24px rgba(12,35,70,0.12); border-top: 10px solid #ffcc04;">',
+    '        <div style="text-align: center; margin-bottom: 20px;">',
+    '          <span style="font-family: Arial, sans-serif; font-size: 14px; font-weight: 900; color: #0c2346; text-transform: uppercase; letter-spacing: 2px; border-bottom: 3px solid #ffcc04; padding-bottom: 6px; display: inline-block;">⚡ Weekly PBIS Dashboard ⚡</span>',
+    '        </div>',
     '        ',
     '        <!-- Stats Grid (Row 1: Numbers) -->',
-    '        <table cellpadding="0" cellspacing="0" border="0" width="100%" style="font-family: Arial, sans-serif;">',
+    '        <table cellpadding="0" cellspacing="0" border="0" width="100%" style="font-family: Arial, sans-serif; margin-bottom: 20px;">',
     '          <tr>',
-    '            <td width="30%" align="center" style="background-color: #f8fafc; border: 1px solid #cbd5e1; border-radius: 10px; padding: 12px;">',
-    '              <span style="font-size: 18px; display: block; margin-bottom: 4px;">📣</span>',
-    '              <span style="font-size: 20px; font-weight: 800; color: #0c2346; display: block;">' + praiseCount + '</span>',
-    '              <span style="font-size: 9px; text-transform: uppercase; color: #64748b; font-weight: bold; display: block; margin-top: 2px; letter-spacing: 0.5px;">Shout-Outs Received</span>',
+    '            <td width="30%" align="center" style="background-color: #f8fafc; border: 2.5px solid #0c2346; border-radius: 12px; padding: 20px 10px; box-shadow: 0 2px 6px rgba(12,35,70,0.03);">',
+    '              <span style="font-size: 38px; display: block; margin-bottom: 6px;">📣</span>',
+    '              <span style="font-size: 44px; font-weight: 900; color: #0c2346; display: block; line-height: 1.1;">' + praiseCount + '</span>',
+    '              <span style="font-size: 10px; text-transform: uppercase; color: #64748b; font-weight: 900; display: block; margin-top: 6px; letter-spacing: 0.5px; line-height: 1.2;">Shout-Outs<br>Received</span>',
     '            </td>',
     '            <td width="5%">&nbsp;</td>',
-    '            <td width="30%" align="center" style="background-color: #f8fafc; border: 1px solid #cbd5e1; border-radius: 10px; padding: 12px;">',
-    '              <span style="font-size: 18px; display: block; margin-bottom: 4px;">📤</span>',
-    '              <span style="font-size: 20px; font-weight: 800; color: #36506e; display: block;">' + shoutoutCount + '</span>',
-    '              <span style="font-size: 9px; text-transform: uppercase; color: #64748b; font-weight: bold; display: block; margin-top: 2px; letter-spacing: 0.5px;">Shout-Outs Sent</span>',
+    '            <td width="30%" align="center" style="background-color: #f8fafc; border: 2.5px solid #0c2346; border-radius: 12px; padding: 20px 10px; box-shadow: 0 2px 6px rgba(12,35,70,0.03);">',
+    '              <span style="font-size: 38px; display: block; margin-bottom: 6px;">📤</span>',
+    '              <span style="font-size: 44px; font-weight: 900; color: #36506e; display: block; line-height: 1.1;">' + shoutoutCount + '</span>',
+    '              <span style="font-size: 10px; text-transform: uppercase; color: #64748b; font-weight: 900; display: block; margin-top: 6px; letter-spacing: 0.5px; line-height: 1.2;">Shout-Outs<br>Sent</span>',
     '            </td>',
     '            <td width="5%">&nbsp;</td>',
-    '            <td width="30%" align="center" style="background-color: #f8fafc; border: 1px solid #cbd5e1; border-radius: 10px; padding: 12px;">',
-    '              <span style="font-size: 18px; display: block; margin-bottom: 4px;">⚡</span>',
-    '              <span style="font-size: 20px; font-weight: 800; color: #16a34a; display: block;">+' + weeklyPoints + '</span>',
-    '              <span style="font-size: 9px; text-transform: uppercase; color: #64748b; font-weight: bold; display: block; margin-top: 2px; letter-spacing: 0.5px;">Points Contributed</span>',
+    '            <td width="30%" align="center" style="background-color: #f8fafc; border: 2.5px solid #0c2346; border-radius: 12px; padding: 20px 10px; box-shadow: 0 2px 6px rgba(12,35,70,0.03);">',
+    '              <span style="font-size: 38px; display: block; margin-bottom: 6px;">⚡</span>',
+    '              <span style="font-size: 44px; font-weight: 900; color: #16a34a; display: block; line-height: 1.1;">+' + weeklyPoints + '</span>',
+    '              <span style="font-size: 10px; text-transform: uppercase; color: #64748b; font-weight: 900; display: block; margin-top: 6px; letter-spacing: 0.5px; line-height: 1.2;">Points<br>Earned</span>',
     '            </td>',
     '          </tr>',
     '        </table>',
     '        ',
     '        <!-- Stats Grid (Row 2: Statuses) -->',
-    '        <table cellpadding="0" cellspacing="0" border="0" width="100%" style="font-family: Arial, sans-serif; margin-top: 12px;">',
+    '        <table cellpadding="0" cellspacing="0" border="0" width="100%" style="font-family: Arial, sans-serif;">',
     '          <tr>',
-    '            <td width="48%" align="center" style="background-color: #fcfaf2; border: 1px solid #ffcc04; border-radius: 10px; padding: 12px;">',
-    '              <span style="font-size: 10px; text-transform: uppercase; color: #0c2346; font-weight: bold; display: block; letter-spacing: 0.5px;">🏆 ' + studentHouse + ' Cup Standing</span>',
-    '              <span style="font-size: 13px; font-weight: 800; color: #0c2346; display: block; margin-top: 4px;">' + currentRankStr + ' (' + houseTotalPoints + ' pts)</span>',
+    '            <td width="48%" align="center" style="background-color: #fcfaf2; border: 2.5px solid #ffcc04; border-radius: 12px; padding: 16px 10px; box-shadow: 0 4px 8px rgba(255,204,4,0.05);">',
+    '              <span style="font-size: 11px; text-transform: uppercase; color: #0c2346; font-weight: 900; display: block; letter-spacing: 0.8px;">🏆 ' + studentHouse + ' standing</span>',
+    '              <span style="font-size: 15px; font-weight: 900; color: #0c2346; display: block; margin-top: 6px;">' + currentRankStr + '</span>',
+    '              <span style="font-size: 11px; color: #475569; display: block; margin-top: 2px; font-weight: bold;">' + houseTotalPoints + ' total pts</span>',
     '            </td>',
     '            <td width="4%">&nbsp;</td>',
-    '            <td width="48%" align="center" style="background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 10px; padding: 12px;">',
-    '              <span style="font-size: 10px; text-transform: uppercase; color: #15803d; font-weight: bold; display: block; letter-spacing: 0.5px;">🎉 Prize Wheel Status</span>',
-    '              <span style="font-size: 13px; font-weight: 800; color: #166534; display: block; margin-top: 4px;">' + eligibilityStatus + ' 🎟️</span>',
+    '            <td width="48%" align="center" style="background-color: #f0fdf4; border: 2.5px solid #bbf7d0; border-radius: 12px; padding: 16px 10px; box-shadow: 0 4px 8px rgba(22,101,52,0.05);">',
+    '              <span style="font-size: 11px; text-transform: uppercase; color: #15803d; font-weight: 900; display: block; letter-spacing: 0.8px;">🎡 Prize Wheel Status</span>',
+    '              <span style="font-size: 15px; font-weight: 900; color: #166534; display: block; margin-top: 6px;">' + eligibilityStatus + ' 🎟️</span>',
+    '              <span style="font-size: 11px; color: #15803d; display: block; margin-top: 2px; font-weight: bold;">Spin today in commons</span>',
     '            </td>',
     '          </tr>',
     '        </table>',
@@ -1283,12 +1342,10 @@ function compileStudentDigestHTML(studentName, praiseCount, shoutoutCount, weekl
     '      <p style="color: #1e293b; font-size: 15px; margin-top: 0; font-weight: bold; line-height: 1.5;">',
     '        ' + greetingText,
     '      </p>',
-    '      <p style="color: #475569; font-size: 13px; line-height: 1.6;">',
-    '        Here is your weekly summary of the Virtual Shout-Outs (VSOs) and points logged for the House Cup. Check in at the school PBIS table on Friday to claim your reward spins on the prize wheel.',
-    '      </p>',
-    '      ',
+    '      ' + introListHtml,
+    '      ' + spearDividerHtml,
     '      ' + dashboardHtml,
-    '      ',
+    '      ' + spearDividerHtml,
     '      ' + sendShoutoutButtonHtml,
     '      ',
     '      ' + receivedSection,
