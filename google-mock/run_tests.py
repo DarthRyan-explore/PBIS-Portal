@@ -546,7 +546,7 @@ else:
     elif not has_received_header:
         print("❌ Frodo Baggins student email is missing a valid rotating shout-out header.")
         digest_passed = False
-    elif "PBIS Quarterly Party!" not in html or "Send a Shout-Out to a Teacher or Staff Member" not in html:
+    elif "PBIS Quarterly Party" not in html or "Send a Shout-Out to a Teacher or Staff Member" not in html:
         print("❌ Frodo Baggins student email is missing quarterly party promo card or shout-out button.")
         digest_passed = False
     elif subject != "Weekly PBIS Digest - Student Rewards & Standings 🏹":

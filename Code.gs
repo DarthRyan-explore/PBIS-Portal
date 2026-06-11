@@ -1025,20 +1025,20 @@ function compileStudentDigestHTML(studentName, praiseCount, shoutoutCount, weekl
   var greetings = [];
   if (praiseCount > 0) {
     greetings = [
-      "Hey " + studentName + "! Look at that, you made it to Friday. Turns out, teachers actually noticed you doing awesome things this week. You received " + praiseCount + " Virtual Shout-Out(s)!",
+      "Hey " + studentName + ". Look at that, you made it to Friday. Turns out, teachers actually noticed you doing awesome things this week. You received " + praiseCount + " Virtual Shout-Out(s).",
       "Well " + studentName + ", another week down. Good news: you got some fan mail from staff. " + praiseCount + " Shout-Out(s), to be exact.",
-      "Hey " + studentName + ". Grab a seat. We compiled your weekly PBIS appreciation report, and you actually did pretty great (contributing +" + weeklyPoints + " points to the " + studentHouse + " House standings!).",
+      "Hey " + studentName + ". Grab a seat. We compiled your weekly PBIS appreciation report, and you actually did pretty great (contributing +" + weeklyPoints + " points to the " + studentHouse + " House standings).",
       "Hey " + studentName + ". Good news: you got " + praiseCount + " Shout-Out(s) this week. That's a solid win for you and the " + studentHouse + "."
     ];
   } else if (shoutoutCount > 0) {
     greetings = [
-      "Hey " + studentName + ". Happy Friday! You didn't receive any staff Shout-Outs this week, but you contributed +" + weeklyPoints + " points to the " + studentHouse + " by shouting out your teachers. Good karma points resolved!",
-      "Hey " + studentName + ". Thanks for showing some love to the staff this week! You sent " + shoutoutCount + " Shout-Out(s) and earned +" + weeklyPoints + " points for the " + studentHouse + "."
+      "Hey " + studentName + ". Happy Friday. You didn't receive any staff Shout-Outs this week, but you contributed +" + weeklyPoints + " points to the " + studentHouse + " by shouting out your teachers. Good karma points resolved.",
+      "Hey " + studentName + ". Thanks for showing some love to the staff this week. You sent " + shoutoutCount + " Shout-Out(s) and earned +" + weeklyPoints + " points for the " + studentHouse + "."
     ];
   } else {
     greetings = [
-      "Hey " + studentName + ". You made it to Friday! No specific Shout-Outs logged for you this week, but just getting to the weekend is a solid accomplishment.",
-      "Well " + studentName + ", another week down. Quiet on the appreciation front this week, but we still value you keeping the vibe going at Copley!"
+      "Hey " + studentName + ". You made it to Friday. No specific Shout-Outs logged for you this week, but just getting to the weekend is a solid accomplishment.",
+      "Well " + studentName + ", another week down. Quiet on the appreciation front this week, but we still value you keeping the vibe going at Copley."
     ];
   }
   var greetingText = greetings[Math.floor(Math.random() * greetings.length)];
@@ -1058,7 +1058,7 @@ function compileStudentDigestHTML(studentName, praiseCount, shoutoutCount, weekl
     }
   }
   
-  var eligibilityStatus = "Eligible!";
+  var eligibilityStatus = "Eligible";
 
   var receivedHeaders = [
     "Here's What Staff Said Behind Your Back",
@@ -1209,10 +1209,10 @@ function compileStudentDigestHTML(studentName, praiseCount, shoutoutCount, weekl
     '      <!-- PBIS Quarterly Parties Incentive Card -->',
     '      <div style="background-color: #ffffff; border: 2px dashed #0c2346; border-radius: 16px; padding: 25px; margin-top: 25px; text-align: center; box-shadow: 0 4px 10px rgba(12,35,70,0.03);">',
     '        <span style="font-size: 32px; display: block; margin-bottom: 8px;">🎁</span>',
-    '        <h4 style="margin: 0 0 6px 0; font-weight: bold; color: #0c2346; font-size: 15px; text-transform: uppercase; letter-spacing: 0.5px; font-family: Arial, sans-serif;">🎯 Next Target Reward: PBIS Quarterly Party!</h4>',
+    '        <h4 style="margin: 0 0 6px 0; font-weight: bold; color: #0c2346; font-size: 15px; text-transform: uppercase; letter-spacing: 0.5px; font-family: Arial, sans-serif;">🎯 Next Target Reward: PBIS Quarterly Party</h4>',
     '        ',
-    '        <div style="display: inline-block; background-color: #e6f4ea; border: 1px solid #34a853; border-radius: 30px; padding: 6px 16px; margin-bottom: 15px; font-size: 11px; font-weight: bold; color: #137333; text-transform: uppercase; letter-spacing: 0.5px;">',
-    '          ⚡ Current Status: On Track & Eligible! 🎉',
+    '        <div style="display: inline-block; background-color: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 30px; padding: 6px 16px; margin-bottom: 15px; font-size: 11px; font-weight: bold; color: #475569; text-transform: uppercase; letter-spacing: 0.5px;">',
+    '          🎟️ Quarterly Incentive Details',
     '        </div>',
     '        ',
     '        <p style="margin: 0 0 18px 0; font-size: 13px; color: #475569; line-height: 1.6; max-width: 500px; margin-left: auto; margin-right: auto; font-family: Arial, sans-serif;">',
@@ -1220,7 +1220,7 @@ function compileStudentDigestHTML(studentName, praiseCount, shoutoutCount, weekl
     '        </p>',
     '        ',
     '        <div style="background-color: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; padding: 10px 14px; font-size: 10px; color: #64748b; text-transform: uppercase; font-weight: bold; letter-spacing: 0.5px; display: inline-block; font-family: Arial, sans-serif;">',
-    '          🎯 Maintain Eligibility: Attend Class • Follow PCD Rules • Respect the Vibe',
+    '          🎯 How to Earn: Attend Class • Follow PCD Rules • Respect the Vibe',
     '        </div>',
     '      </div>'
   ].join('\n');
@@ -1262,7 +1262,7 @@ function compileStudentDigestHTML(studentName, praiseCount, shoutoutCount, weekl
     '            </td>',
     '            <td width="4%">&nbsp;</td>',
     '            <td width="48%" align="center" style="background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 10px; padding: 12px;">',
-    '              <span style="font-size: 10px; text-transform: uppercase; color: #15803d; font-weight: bold; display: block; letter-spacing: 0.5px;">🎉 Spin Wheel Eligibility</span>',
+    '              <span style="font-size: 10px; text-transform: uppercase; color: #15803d; font-weight: bold; display: block; letter-spacing: 0.5px;">🎉 Prize Wheel Status</span>',
     '              <span style="font-size: 13px; font-weight: 800; color: #166534; display: block; margin-top: 4px;">' + eligibilityStatus + ' 🎟️</span>',
     '            </td>',
     '          </tr>',
@@ -1284,7 +1284,7 @@ function compileStudentDigestHTML(studentName, praiseCount, shoutoutCount, weekl
     '        ' + greetingText,
     '      </p>',
     '      <p style="color: #475569; font-size: 13px; line-height: 1.6;">',
-    '        Here is your weekly summary of the Virtual Shout-Outs (VSOs) and points logged for the House Cup. Show this email at the physical school PBIS table on Friday to claim your reward spins on the prize wheel!',
+    '        Here is your weekly summary of the Virtual Shout-Outs (VSOs) and points logged for the House Cup. Check in at the school PBIS table on Friday to claim your reward spins on the prize wheel.',
     '      </p>',
     '      ',
     '      ' + dashboardHtml,
