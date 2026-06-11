@@ -107,15 +107,15 @@ function processShoutoutSubmission(values, isStaffForm, sheet) {
   }
   
   // Dynamic header offsets matching with fallbacks
-  var emailIdx = 1;
-  var firstIdx = 2;
-  var lastIdx = 3;
-  var targetIdx = 4;
-  var categoryIdx = 5;
-  var anonymousIdx = 7;
-  var quickPickIdx = isStaffForm ? 6 : -1;
-  var writeInIdx = isStaffForm ? 7 : -1;
-  var messageIdx = isStaffForm ? -1 : 6;
+  var emailIdx = -1;
+  var firstIdx = -1;
+  var lastIdx = -1;
+  var targetIdx = -1;
+  var categoryIdx = -1;
+  var anonymousIdx = -1;
+  var quickPickIdx = -1;
+  var writeInIdx = -1;
+  var messageIdx = -1;
   var nameIdx = -1;
   var consentIdx = -1;
   
@@ -132,13 +132,13 @@ function processShoutoutSubmission(values, isStaffForm, sheet) {
         quickPickIdx = c;
       } else if (h.indexOf("write") !== -1) {
         writeInIdx = c;
-      } else if (h.indexOf("category") !== -1) {
+      } else if (h.indexOf("category") !== -1 || h.indexOf("categories") !== -1 || h.indexOf("which shout-out") !== -1 || h.indexOf("acknowledg") !== -1 || (isStaffForm && h.indexOf("for") !== -1)) {
         categoryIdx = c;
-      } else if (h.indexOf("anonymous") !== -1) {
+      } else if (h.indexOf("anonymous") !== -1 || h.indexOf("hidden") !== -1) {
         anonymousIdx = c;
-      } else if (h.indexOf("message") !== -1 || h.indexOf("appreciate") !== -1) {
+      } else if (h.indexOf("message") !== -1 || h.indexOf("appreciate") !== -1 || h.indexOf("explanation") !== -1 || h.indexOf("remarks") !== -1 || h.indexOf("why") !== -1 || h.indexOf("reason") !== -1) {
         messageIdx = c;
-      } else if (isStaffForm && h.indexOf("student") !== -1) {
+      } else if (isStaffForm && h.indexOf("student") !== -1 && h.indexOf("for") === -1 && h.indexOf("acknowledg") === -1) {
         targetIdx = c;
       } else if (!isStaffForm && (h.indexOf("teacher") !== -1 || h.indexOf("staff") !== -1 || h.indexOf("member") !== -1)) {
         targetIdx = c;
@@ -148,6 +148,20 @@ function processShoutoutSubmission(values, isStaffForm, sheet) {
         consentIdx = c;
       }
     }
+  }
+
+  // Apply default fallbacks for any indexes that weren't resolved
+  if (emailIdx === -1) emailIdx = 1;
+  if (firstIdx === -1 && nameIdx === -1) firstIdx = 2;
+  if (lastIdx === -1 && nameIdx === -1) lastIdx = 3;
+  if (targetIdx === -1) targetIdx = 4;
+  if (categoryIdx === -1) categoryIdx = 5;
+  if (anonymousIdx === -1) anonymousIdx = 7;
+  if (isStaffForm) {
+    if (quickPickIdx === -1) quickPickIdx = 6;
+    if (writeInIdx === -1) writeInIdx = 7;
+  } else {
+    if (messageIdx === -1) messageIdx = 6;
   }
   
   var timestamp = values[0];
