@@ -1966,10 +1966,7 @@ function updateFeaturedShoutOutSlides(presentationId, limit, filterDirection) {
           s.remove();
         }
       } catch (e) {
-        // If we fail to read notes, only delete if it's after the template and not in a shared deck setup
-        if (j > templateIndex && slides.length > 5) {
-          s.remove();
-        }
+        Logger.log("Error reading notes on slide index " + j + ": " + e.toString());
       }
     }
 
@@ -2171,9 +2168,7 @@ function updateStaffLeaderboardSlides(presentationId) {
           s.remove();
         }
       } catch (e) {
-        if (j > templateIndex && slides.length > 5) {
-          s.remove();
-        }
+        Logger.log("Error reading notes on slide index " + j + ": " + e.toString());
       }
     }
 
@@ -2288,9 +2283,7 @@ function updateHouseCupStandingsSlides(presentationId) {
           s.remove();
         }
       } catch (e) {
-        if (j > templateIndex && slides.length > 5) {
-          s.remove();
-        }
+        Logger.log("Error reading notes on slide index " + j + ": " + e.toString());
       }
     }
 
