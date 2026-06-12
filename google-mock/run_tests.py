@@ -719,17 +719,17 @@ var SlidesApp = {
               replacedTexts.push({ target: target, val: val });
             },
             getNotesPage: function() {
+              var textObj = {
+                setText: function(text) { this._text = text; },
+                asString: function() { return this._text || ""; },
+                _text: ""
+              };
+              var shapeObj = {
+                getText: function() { return textObj; }
+              };
               return {
-                getNotesBody: function() {
-                  return {
-                    getText: function() {
-                      return {
-                        setText: function(text) {},
-                        asString: function() { return ""; }
-                      };
-                    }
-                  };
-                }
+                getNotesBody: function() { return shapeObj; },
+                getSpeakerNotesShape: function() { return shapeObj; }
               };
             }
           }
@@ -743,17 +743,17 @@ var SlidesApp = {
           },
           setSkipped: function(skipped) {},
           getNotesPage: function() {
+            var textObj = {
+              setText: function(text) { this._text = text; },
+              asString: function() { return this._text || ""; },
+              _text: ""
+            };
+            var shapeObj = {
+              getText: function() { return textObj; }
+            };
             return {
-              getNotesBody: function() {
-                return {
-                  getText: function() {
-                    return {
-                      setText: function(text) {},
-                      asString: function() { return ""; }
-                    };
-                  }
-                };
-              }
+              getNotesBody: function() { return shapeObj; },
+              getSpeakerNotesShape: function() { return shapeObj; }
             };
           }
         };

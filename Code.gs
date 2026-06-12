@@ -1836,6 +1836,17 @@ function updateFeaturedShoutOutSlides(presentationId, limit, filterDirection) {
     }
     var templateSlide = slides[templateIndex] || slides[0];
 
+    // Resolve other template indices to protect them and identify legacy slides
+    var leaderboardIdx = 0;
+    if (sysConfig.LEADERBOARD_TEMPLATE_INDEX !== undefined && sysConfig.LEADERBOARD_TEMPLATE_INDEX !== "") {
+      leaderboardIdx = parseInt(sysConfig.LEADERBOARD_TEMPLATE_INDEX);
+    }
+    var houseCupIdx = 0;
+    if (sysConfig.HOUSE_CUP_TEMPLATE_INDEX !== undefined && sysConfig.HOUSE_CUP_TEMPLATE_INDEX !== "") {
+      houseCupIdx = parseInt(sysConfig.HOUSE_CUP_TEMPLATE_INDEX);
+    }
+    var maxTemplateIdx = Math.max(templateIndex, Math.max(leaderboardIdx, houseCupIdx));
+
     // Read approved shoutouts from GenYES Moderation Queue
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var modSheet = ss.getSheetByName(CONFIG.MODERATION_SHEET_NAME);
@@ -1958,11 +1969,29 @@ function updateFeaturedShoutOutSlides(presentationId, limit, filterDirection) {
 
     // Delete existing shout-out slides from previous runs using tags to support shared decks
     for (var j = slides.length - 1; j >= 0; j--) {
+      // Safety: Never delete template slides or any slides at or before the maximum template index
+      if (j === templateIndex || j === leaderboardIdx || j === houseCupIdx || j <= maxTemplateIdx) {
+        continue;
+      }
+      
       var s = slides[j];
-      if (j === templateIndex) continue; // Safety: Never delete the template slide itself
       try {
-        var notes = s.getNotesPage().getNotesBody().getText().asString();
-        if (notes.indexOf("[PBIS_SHOUTOUT]") !== -1) {
+        var notesPage = s.getNotesPage();
+        var notesShape = notesPage ? notesPage.getSpeakerNotesShape() : null;
+        var notes = notesShape ? notesShape.getText().asString() : "";
+        var hasShoutoutTag = notes.indexOf("[PBIS_SHOUTOUT]") !== -1;
+        var hasLeaderboardTag = notes.indexOf("[PBIS_LEADERBOARD]") !== -1;
+        var hasCopleyCupTag = notes.indexOf("[PBIS_COPLEY_CUP]") !== -1;
+        
+        var shouldRemove = false;
+        if (hasShoutoutTag) {
+          shouldRemove = true;
+        } else if (!hasLeaderboardTag && !hasCopleyCupTag) {
+          // Legacy or untagged slide at index > maxTemplateIdx: safely remove
+          shouldRemove = true;
+        }
+        
+        if (shouldRemove) {
           s.remove();
         }
       } catch (e) {
@@ -1975,7 +2004,11 @@ function updateFeaturedShoutOutSlides(presentationId, limit, filterDirection) {
       var newSlide = deck.appendSlide(templateSlide);
       newSlide.setSkipped(false);
       try {
-        newSlide.getNotesPage().getNotesBody().getText().setText("[PBIS_SHOUTOUT]");
+        var notesPage = newSlide.getNotesPage();
+        var notesShape = notesPage ? notesPage.getSpeakerNotesShape() : null;
+        if (notesShape) {
+          notesShape.getText().setText("[PBIS_SHOUTOUT]");
+        }
       } catch (e) {
         Logger.log("Could not set speaker notes tag: " + e.toString());
       }
@@ -2045,6 +2078,17 @@ function updateStaffLeaderboardSlides(presentationId) {
       templateIndex = parseInt(sysConfig.LEADERBOARD_TEMPLATE_INDEX);
     }
     var templateSlide = slides[templateIndex] || slides[0];
+
+    // Resolve other template indices to protect them and identify legacy slides
+    var shoutOutIdx = 0;
+    if (sysConfig.SLIDES_TEMPLATE_INDEX !== undefined && sysConfig.SLIDES_TEMPLATE_INDEX !== "") {
+      shoutOutIdx = parseInt(sysConfig.SLIDES_TEMPLATE_INDEX);
+    }
+    var houseCupIdx = 0;
+    if (sysConfig.HOUSE_CUP_TEMPLATE_INDEX !== undefined && sysConfig.HOUSE_CUP_TEMPLATE_INDEX !== "") {
+      houseCupIdx = parseInt(sysConfig.HOUSE_CUP_TEMPLATE_INDEX);
+    }
+    var maxTemplateIdx = Math.max(shoutOutIdx, Math.max(templateIndex, houseCupIdx));
 
     // Query data from Moderation Queue
     var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -2160,11 +2204,29 @@ function updateStaffLeaderboardSlides(presentationId) {
 
     // Delete any old generated leaderboard slides using tags to support shared decks
     for (var j = slides.length - 1; j >= 0; j--) {
+      // Safety: Never delete template slides or any slides at or before the maximum template index
+      if (j === templateIndex || j === shoutOutIdx || j === houseCupIdx || j <= maxTemplateIdx) {
+        continue;
+      }
+      
       var s = slides[j];
-      if (j === templateIndex) continue; // Safety: Never delete the template slide itself
       try {
-        var notes = s.getNotesPage().getNotesBody().getText().asString();
-        if (notes.indexOf("[PBIS_LEADERBOARD]") !== -1) {
+        var notesPage = s.getNotesPage();
+        var notesShape = notesPage ? notesPage.getSpeakerNotesShape() : null;
+        var notes = notesShape ? notesShape.getText().asString() : "";
+        var hasShoutoutTag = notes.indexOf("[PBIS_SHOUTOUT]") !== -1;
+        var hasLeaderboardTag = notes.indexOf("[PBIS_LEADERBOARD]") !== -1;
+        var hasCopleyCupTag = notes.indexOf("[PBIS_COPLEY_CUP]") !== -1;
+        
+        var shouldRemove = false;
+        if (hasLeaderboardTag) {
+          shouldRemove = true;
+        } else if (!hasShoutoutTag && !hasCopleyCupTag) {
+          // Legacy or untagged slide at index > maxTemplateIdx: safely remove
+          shouldRemove = true;
+        }
+        
+        if (shouldRemove) {
           s.remove();
         }
       } catch (e) {
@@ -2176,7 +2238,11 @@ function updateStaffLeaderboardSlides(presentationId) {
     var newSlide = deck.appendSlide(templateSlide);
     newSlide.setSkipped(false);
     try {
-      newSlide.getNotesPage().getNotesBody().getText().setText("[PBIS_LEADERBOARD]");
+      var notesPage = newSlide.getNotesPage();
+      var notesShape = notesPage ? notesPage.getSpeakerNotesShape() : null;
+      if (notesShape) {
+        notesShape.getText().setText("[PBIS_LEADERBOARD]");
+      }
     } catch (e) {
       Logger.log("Could not set speaker notes tag: " + e.toString());
     }
@@ -2244,6 +2310,17 @@ function updateHouseCupStandingsSlides(presentationId) {
     }
     var templateSlide = slides[templateIndex] || slides[0];
 
+    // Resolve other template indices to protect them and identify legacy slides
+    var shoutOutIdx = 0;
+    if (sysConfig.SLIDES_TEMPLATE_INDEX !== undefined && sysConfig.SLIDES_TEMPLATE_INDEX !== "") {
+      shoutOutIdx = parseInt(sysConfig.SLIDES_TEMPLATE_INDEX);
+    }
+    var leaderboardIdx = 0;
+    if (sysConfig.LEADERBOARD_TEMPLATE_INDEX !== undefined && sysConfig.LEADERBOARD_TEMPLATE_INDEX !== "") {
+      leaderboardIdx = parseInt(sysConfig.LEADERBOARD_TEMPLATE_INDEX);
+    }
+    var maxTemplateIdx = Math.max(shoutOutIdx, Math.max(leaderboardIdx, templateIndex));
+
     // Read points from House_Cup_Totals sheet
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var ledgerSheet = getLedgerSheet(ss);
@@ -2275,11 +2352,29 @@ function updateHouseCupStandingsSlides(presentationId) {
 
     // Delete any old generated standings slides using tags to support shared decks
     for (var j = slides.length - 1; j >= 0; j--) {
+      // Safety: Never delete template slides or any slides at or before the maximum template index
+      if (j === templateIndex || j === shoutOutIdx || j === leaderboardIdx || j <= maxTemplateIdx) {
+        continue;
+      }
+      
       var s = slides[j];
-      if (j === templateIndex) continue; // Safety: Never delete the template slide itself
       try {
-        var notes = s.getNotesPage().getNotesBody().getText().asString();
-        if (notes.indexOf("[PBIS_COPLEY_CUP]") !== -1) {
+        var notesPage = s.getNotesPage();
+        var notesShape = notesPage ? notesPage.getSpeakerNotesShape() : null;
+        var notes = notesShape ? notesShape.getText().asString() : "";
+        var hasShoutoutTag = notes.indexOf("[PBIS_SHOUTOUT]") !== -1;
+        var hasLeaderboardTag = notes.indexOf("[PBIS_LEADERBOARD]") !== -1;
+        var hasCopleyCupTag = notes.indexOf("[PBIS_COPLEY_CUP]") !== -1;
+        
+        var shouldRemove = false;
+        if (hasCopleyCupTag) {
+          shouldRemove = true;
+        } else if (!hasShoutoutTag && !hasLeaderboardTag) {
+          // Legacy or untagged slide at index > maxTemplateIdx: safely remove
+          shouldRemove = true;
+        }
+        
+        if (shouldRemove) {
           s.remove();
         }
       } catch (e) {
@@ -2291,7 +2386,11 @@ function updateHouseCupStandingsSlides(presentationId) {
     var newSlide = deck.appendSlide(templateSlide);
     newSlide.setSkipped(false); // Force the duplicated slide to be visible
     try {
-      newSlide.getNotesPage().getNotesBody().getText().setText("[PBIS_COPLEY_CUP]");
+      var notesPage = newSlide.getNotesPage();
+      var notesShape = notesPage ? notesPage.getSpeakerNotesShape() : null;
+      if (notesShape) {
+        notesShape.getText().setText("[PBIS_COPLEY_CUP]");
+      }
     } catch (e) {
       Logger.log("Could not set speaker notes tag: " + e.toString());
     }
