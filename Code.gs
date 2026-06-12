@@ -666,6 +666,12 @@ function sendWeeklyDigest() {
     var weeklyVSOs = teacherWeeklyVSOs[staffName] || [];
     var teacherDept = stats.dept || "General Staff";
     
+    // RED TEAM FIX: Suppress zero-value digests during low activity or summer breaks to prevent staff email flooding
+    if (stats.received === 0 && activeCaseloadCount === 0 && weeklyVSOs.length === 0) {
+      Logger.log("Skipping empty weekly digest email for: " + stats.email);
+      continue;
+    }
+    
     var htmlBody = compileStaffDigestHTML(
       staffName, 
       stats.received, 
@@ -716,14 +722,8 @@ function sendWeeklyDigest() {
       parentEmail = sRecord.parentEmail;
     } else {
       studentHouse = STUDENT_HOUSE_MAPPING[sName] || "Freshmen";
-      var nameParts = sName.split(" ");
-      var firstPart = nameParts[0] || "";
-      var lastPart = nameParts.slice(1).join(" ") || "";
-      if (firstPart && lastPart) {
-        studentEmail = (firstPart.charAt(0) + lastPart).toLowerCase().replace(/[^a-z0-9]/g, "") + "@cfcsindians.org";
-      } else {
-        studentEmail = sName.toLowerCase().replace(/[^a-z0-9]/g, "") + "@cfcsindians.org";
-      }
+      Logger.log("WARNING: Student '" + sName + "' not found in Master_Roster. Email digest delivery skipped to prevent PII leakage to guessed address.");
+      studentEmail = ""; // Set empty to skip sending and prevent wrong inbox deliveries
     }
     
     if (!studentEmail) continue;
@@ -2734,6 +2734,9 @@ function getStudentDirectory() {
     var parentEmail = parentEmailCol !== -1 && data[r][parentEmailCol] ? data[r][parentEmailCol].toString().trim() : "";
     
     if (fullName) {
+      if (studentDir.hasOwnProperty(fullName)) {
+        Logger.log("CRITICAL SYSTEM ALERT: Duplicate student name '" + fullName + "' detected in Master_Roster. Data leak risk between " + studentDir[fullName].email + " and " + email + ". System requires unique IDs.");
+      }
       studentDir[fullName] = {
         firstName: fName,
         lastName: lName,

@@ -369,7 +369,8 @@ var mockSheets = {{
   "GenYES_Moderation_Queue": [
     ["Timestamp", "Sender", "House", "Target Staff", "Category", "Message", "Anonymous", "Status", "Audited By", "Audit Date", "Feature on TV?"],
     [new Date(), "Luke Skywalker", "Sophomores", "Sarah Janiga", "GOAT VSO", "Great teacher!", "No", "Approved", "GenYES Operator", new Date(), "Yes"],
-    [new Date(), "Sarah Janiga", "Seniors", "Frodo Baggins", "Academic Support", "Frodo is making great progress!", "No", "Approved", "Auto-Approved (Staff)", new Date(), "No"]
+    [new Date(), "Sarah Janiga", "Seniors", "Frodo Baggins", "Academic Support", "Frodo is making great progress!", "No", "Approved", "Auto-Approved (Staff)", new Date(), "No"],
+    [new Date(), "Luke Skywalker", "Sophomores", "Amy Gray", "GOAT VSO", "Great support staff member!", "No", "Approved", "GenYES Operator", new Date(), "Yes"]
   ],
   "Master_Roster": [
     ["First Name", "Last Name", "Email", "Grade", "Parent Email"],
