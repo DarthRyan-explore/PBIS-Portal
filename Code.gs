@@ -1950,6 +1950,7 @@ function updateFeaturedShoutOutSlides(presentationId, limit, filterDirection) {
     // Generate new slides by duplicating the template slide
     approvedShoutouts.forEach(function(shoutout) {
       var newSlide = deck.appendSlide(templateSlide);
+      newSlide.setSkipped(false);
       
       // Build dynamic placeholders dictionary supporting all variations/typos
       var placeholders = {
@@ -2141,6 +2142,7 @@ function updateStaffLeaderboardSlides(presentationId) {
 
     // Duplicate template slide
     var newSlide = deck.appendSlide(templateSlide);
+    newSlide.setSkipped(false);
 
     // Get current month name
     var monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];

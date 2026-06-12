@@ -725,7 +725,8 @@ var SlidesApp = {
         return {
           replaceAllText: function(target, val) {
             replacedTexts.push({ target: target, val: val });
-          }
+          },
+          setSkipped: function(skipped) {}
         };
       }
     };
