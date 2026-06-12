@@ -23,6 +23,7 @@ var CONFIG = {
   DENISE_FOLDER_ID: "YOUR_DENISE_FOLDER_ID_HERE", // Folder ID containing student caseload JSONs
   MTSS_FORM_URL: "https://docs.google.com/forms/d/e/1FAIpQLSdf_staff_mtss_log_form_placeholder/viewform", // URL to staff MTSS Tier 1 logging Google Form
   LEADERBOARD_SLIDES_PRESENTATION_ID: "1CxXwvPcujycdqdDNTU4JKB_hWd9esbQB6Ao_4aBDH8s", // Default ID for the monthly staff VSO leaderboard slides
+  HOUSE_CUP_SLIDES_PRESENTATION_ID: "YOUR_HOUSE_CUP_SLIDES_PRESENTATION_ID_HERE", // Default ID for the live House Cup standings slides
   DEBUG_MODE: true // SAFETY GATE: Set to true to prevent sending live emails during testing
 };
 
@@ -347,7 +348,8 @@ function getSystemConfig() {
     DENISE_FOLDER_ID: CONFIG.DENISE_FOLDER_ID,
     MTSS_FORM_URL: CONFIG.MTSS_FORM_URL,
     STAFF_FORM_SHEET_NAME: CONFIG.STAFF_FORM_SHEET_NAME,
-    LEADERBOARD_SLIDES_PRESENTATION_ID: CONFIG.LEADERBOARD_SLIDES_PRESENTATION_ID
+    LEADERBOARD_SLIDES_PRESENTATION_ID: CONFIG.LEADERBOARD_SLIDES_PRESENTATION_ID,
+    HOUSE_CUP_SLIDES_PRESENTATION_ID: CONFIG.HOUSE_CUP_SLIDES_PRESENTATION_ID
   };
   
   try {
@@ -2182,6 +2184,103 @@ function updateStaffLeaderboardSlides(presentationId) {
 }
 
 /**
+ * Calculates current House Cup standings (Grade Cohort totals) and updates a Google Slides presentation template.
+ *
+ * @param {string} presentationId The Google Slides File ID.
+ */
+function updateHouseCupStandingsSlides(presentationId) {
+  if (!presentationId || presentationId === "YOUR_HOUSE_CUP_SLIDES_PRESENTATION_ID_HERE" || presentationId === "") {
+    Logger.log("House Cup Slides sync skipped: No presentationId provided.");
+    return;
+  }
+
+  try {
+    var deck = SlidesApp.openById(presentationId);
+    var slides = deck.getSlides();
+    if (slides.length === 0) {
+      Logger.log("Error: House Cup presentation is empty.");
+      return;
+    }
+
+    var sysConfig = getSystemConfig();
+    var templateIndex = 0; // The template slide is at index 0
+    if (sysConfig.HOUSE_CUP_TEMPLATE_INDEX !== undefined && sysConfig.HOUSE_CUP_TEMPLATE_INDEX !== "") {
+      templateIndex = parseInt(sysConfig.HOUSE_CUP_TEMPLATE_INDEX);
+    }
+    var templateSlide = slides[templateIndex] || slides[0];
+
+    // Read points from House_Cup_Totals sheet
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var ledgerSheet = ss.getSheetByName(CONFIG.LEDGER_SHEET_NAME);
+    if (!ledgerSheet) {
+      Logger.log("Ledger sheet not found. Cannot calculate standings.");
+      return;
+    }
+
+    var data = ledgerSheet.getDataRange().getValues();
+    if (data.length <= 1) {
+      Logger.log("No data in House Cup ledger.");
+      return;
+    }
+
+    // Parse houses and points
+    var stands = [];
+    for (var i = 1; i < data.length; i++) {
+      var houseName = data[i][0] ? data[i][0].toString().trim() : "";
+      var points = data[i][1] ? parseFloat(data[i][1]) : 0;
+      if (houseName) {
+        stands.push({ name: houseName, points: points });
+      }
+    }
+
+    // Sort standings in descending order
+    stands.sort(function(a, b) {
+      return b.points - a.points;
+    });
+
+    // Delete any old generated standings slides (keep only template slide at index 0)
+    var slidesToDelete = [];
+    var keepCount = templateIndex + 1;
+    for (var j = slides.length - 1; j >= keepCount; j--) {
+      slidesToDelete.push(slides[j]);
+    }
+    slidesToDelete.forEach(function(s) {
+      s.remove();
+    });
+
+    // Duplicate template slide
+    var newSlide = deck.appendSlide(templateSlide);
+    newSlide.setSkipped(false); // Force the duplicated slide to be visible
+
+    // Build replacement placeholders
+    var placeholders = {};
+    for (var rank = 1; rank <= 4; rank++) {
+      var item = stands[rank - 1];
+      placeholders["R" + rank + "_NAME"] = item ? item.name : "-";
+      placeholders["R" + rank + "_POINTS"] = item ? item.points.toString() : "0";
+    }
+
+    // Replace text placeholders on the new slide
+    for (var key in placeholders) {
+      var val = placeholders[key];
+      var keyUpper = key.toUpperCase();
+      var keyLower = key.toLowerCase();
+
+      newSlide.replaceAllText("{{" + keyUpper + "}}", val);
+      newSlide.replaceAllText("{{" + keyLower + "}}", val);
+      newSlide.replaceAllText("{" + keyUpper + "}", val);
+      newSlide.replaceAllText("{" + keyLower + "}", val);
+      newSlide.replaceAllText("{{ " + keyUpper + " }}", val);
+      newSlide.replaceAllText("{{ " + keyLower + " }}", val);
+    }
+
+    Logger.log("Successfully updated monthly House Cup standings slide!");
+  } catch (err) {
+    Logger.log("Failed to update House Cup Google Slides: " + err.toString());
+  }
+}
+
+/**
  * Looks up a student's Grade/House in the Master_Roster tab by email or name.
  * Supports auto-resolving columns based on spreadsheet headers.
  *
@@ -2747,8 +2846,9 @@ function doGet(e) {
 function onOpen() {
   var ui = SpreadsheetApp.getUi();
   ui.createMenu("🏹 PBIS Admin")
-    .addItem("Sync Hallway TV Slides", "triggerSlidesSyncManual")
+    .addItem("Sync TV Slides", "triggerSlidesSyncManual")
     .addItem("Sync Monthly Staff Leaderboard", "triggerLeaderboardSyncManual")
+    .addItem("Sync House Cup Standings", "triggerHouseCupSyncManual")
     .addItem("Send Friday Staff Digests Now", "sendWeeklyDigest")
     .addSeparator()
     .addItem("Preview Staff Digest Email", "sendTestDigestToMe")
@@ -2756,6 +2856,7 @@ function onOpen() {
     .addItem("Preview Parent Digest Email", "testSendParentDigest")
     .addSeparator()
     .addItem("Trigger Setup Guide / Diagnostics", "showTriggerSetupGuide")
+    .addItem("Create/Verify Database Sheet Templates", "initializeDatabaseTemplates")
     .addToUi();
 }
 
@@ -2769,7 +2870,7 @@ function showTriggerSetupGuide() {
     "🏹 Copley High School PBIS System Setup Guide (Pure Google Workspace Model)",
     "===========================================================",
     "",
-    "To enable automated Friday emails and real-time hallway TV Slide updates, you must configure three triggers in this Apps Script project:",
+    "To enable automated Friday emails and real-time TV Slide updates, you must configure three triggers in this Apps Script project:",
     "",
     "1. Form Submit Trigger (For student shout-outs):",
     "   - Function: onFormSubmitTrigger",
@@ -2794,6 +2895,137 @@ function showTriggerSetupGuide() {
   ].join("\n");
   
   ui.alert("PBIS Admin Trigger Setup Guide", message, ui.ButtonSet.OK);
+}
+
+/**
+ * Creates or verifies all required database sheet tabs with their headers,
+ * format settings, and basic instructions, preparing the spreadsheet for 2026-2027.
+ */
+function initializeDatabaseTemplates() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var ui = SpreadsheetApp.getUi();
+  
+  // 1. _System_Config sheet tab
+  var sysConfigSheet = null;
+  var sheets = ss.getSheets();
+  for (var i = 0; i < sheets.length; i++) {
+    var nameNormalized = sheets[i].getName().toLowerCase().replace(/[\s_]/g, "");
+    if (nameNormalized === "systemconfig") {
+      sysConfigSheet = sheets[i];
+      break;
+    }
+  }
+  
+  if (!sysConfigSheet) {
+    sysConfigSheet = ss.insertSheet("_System_Config");
+    sysConfigSheet.appendRow(["Setting Key", "Value", "Description"]);
+    sysConfigSheet.getRange(1, 1, 1, 3).setFontWeight("bold").setBackground("#0c2346").setFontColor("#ffcc04");
+    
+    var defaultConfig = [
+      ["DENISE_FOLDER_ID", "YOUR_GOOGLE_DRIVE_FOLDER_ID_HERE", "Drive Folder ID containing student caseload JSONs"],
+      ["MTSS_FORM_URL", "YOUR_MTSS_FORM_LINK_HERE", "Google Forms URL for submitting MTSS support requests"],
+      ["STAFF_FORM_SHEET_NAME", "Form Responses 2", "The sheet name that captures staff form submissions"],
+      ["SLIDES_PRESENTATION_ID", "YOUR_SLIDES_PRESENTATION_ID_HERE", "Main Google Slides presentation ID for student-to-staff/general TV signage"],
+      ["STAFF_SLIDES_PRESENTATION_ID", "YOUR_STAFF_SLIDES_PRESENTATION_ID_HERE", "Google Slides presentation ID for staff-to-student TV signage"],
+      ["LEADERBOARD_SLIDES_PRESENTATION_ID", "1CxXwvPcujycdqdDNTU4JKB_hWd9esbQB6Ao_4aBDH8s", "Google Slides presentation ID for the monthly staff leaderboard"],
+      ["HOUSE_CUP_SLIDES_PRESENTATION_ID", "YOUR_HOUSE_CUP_SLIDES_PRESENTATION_ID_HERE", "Google Slides presentation ID for the live House Cup standings"],
+      ["HOUSE_CUP_TEMPLATE_INDEX", "0", "0-based index of the House Cup slide template in the presentation"],
+      ["LEADERBOARD_TEMPLATE_INDEX", "0", "0-based index of the Staff Leaderboard slide template in the presentation"]
+    ];
+    defaultConfig.forEach(function(row) {
+      sysConfigSheet.appendRow(row);
+    });
+    sysConfigSheet.autoResizeColumns(1, 3);
+  }
+  
+  // 2. Master_Roster student sheet
+  var rosterSheet = ss.getSheetByName("Master_Roster");
+  if (!rosterSheet) {
+    rosterSheet = ss.insertSheet("Master_Roster");
+    rosterSheet.appendRow(["First Name", "Last Name", "Email", "Grade", "Parent Email"]);
+    rosterSheet.getRange(1, 1, 1, 5).setFontWeight("bold").setBackground("#0c2346").setFontColor("#ffcc04");
+    
+    // Add some sample mock student rows
+    var sampleStudents = [
+      ["Frodo", "Baggins", "frodo.baggins@copley-fairlawn.org", "12", "parent.baggins@example.com"],
+      ["Ahsoka", "Tano", "ahsoka.tano@copley-fairlawn.org", "11", "parent.tano@example.com"],
+      ["Luke", "Skywalker", "luke.skywalker@copley-fairlawn.org", "10", "parent.skywalker@example.com"],
+      ["Peter", "Parker", "peter.parker@copley-fairlawn.org", "9", "parent.parker@example.com"]
+    ];
+    sampleStudents.forEach(function(row) {
+      rosterSheet.appendRow(row);
+    });
+    rosterSheet.autoResizeColumns(1, 5);
+  }
+  
+  // 3. Staff_Directory sheet
+  var staffSheet = ss.getSheetByName("Staff_Directory");
+  if (!staffSheet) {
+    staffSheet = ss.insertSheet("Staff_Directory");
+    staffSheet.appendRow(["Last Name", "First Name", "Class/Type", "Department/Role", "Email"]);
+    staffSheet.getRange(1, 1, 1, 5).setFontWeight("bold").setBackground("#0c2346").setFontColor("#ffcc04");
+    
+    // Add some sample mock staff rows
+    var sampleStaff = [
+      ["Janiga", "Sarah", "Teacher", "English", "sarah.janiga@copley-fairlawn.org"],
+      ["Malcolm", "Lee", "Teacher", "English", "lee.malcolm@copley-fairlawn.org"],
+      ["Steffen", "Maggie", "Teacher", "English", "maggie.steffen@copley-fairlawn.org"],
+      ["Gray", "Amy", "Student Support Services", "School Counseling", "amy.gray@copley-fairlawn.org"],
+      ["Oden", "Tim", "Student Support Services", "Administration", "tim.oden@copley-fairlawn.org"]
+    ];
+    sampleStaff.forEach(function(row) {
+      staffSheet.appendRow(row);
+    });
+    staffSheet.autoResizeColumns(1, 5);
+  }
+  
+  // 4. House_Cup_Totals sheet
+  var ledgerSheet = ss.getSheetByName(CONFIG.LEDGER_SHEET_NAME);
+  if (!ledgerSheet) {
+    ledgerSheet = ss.insertSheet(CONFIG.LEDGER_SHEET_NAME);
+    ledgerSheet.appendRow(["House Name", "Total Points", "Last Updated"]);
+    ledgerSheet.getRange(1, 1, 1, 3).setFontWeight("bold").setBackground("#0c2346").setFontColor("#ffcc04");
+    ledgerSheet.appendRow(["Seniors", 0, new Date()]);
+    ledgerSheet.appendRow(["Juniors", 0, new Date()]);
+    ledgerSheet.appendRow(["Sophomores", 0, new Date()]);
+    ledgerSheet.appendRow(["Freshmen", 0, new Date()]);
+    ledgerSheet.autoResizeColumns(1, 3);
+  }
+  
+  // 5. GenYES_Moderation_Queue sheet
+  var modSheet = ss.getSheetByName(CONFIG.MODERATION_SHEET_NAME);
+  if (!modSheet) {
+    modSheet = ss.insertSheet(CONFIG.MODERATION_SHEET_NAME);
+    modSheet.appendRow(["Timestamp", "Sender", "House", "Target Staff", "Category", "Message", "Anonymous", "Status", "Audited By", "Audit Date", "Feature on TV?", "Big Screen Consent"]);
+    modSheet.getRange(1, 1, 1, 12).setFontWeight("bold").setBackground("#0c2346").setFontColor("#ffcc04");
+    modSheet.autoResizeColumns(1, 12);
+  }
+  
+  // 6. MTSS_Interventions_Log sheet
+  var mtssSheet = ss.getSheetByName(CONFIG.MTSS_SHEET_NAME);
+  if (!mtssSheet) {
+    mtssSheet = ss.insertSheet(CONFIG.MTSS_SHEET_NAME);
+    mtssSheet.appendRow(["Timestamp", "Teacher Email", "Student First Name", "Student Last Name", "Intervention Details", "Status"]);
+    mtssSheet.getRange(1, 1, 1, 6).setFontWeight("bold").setBackground("#0c2346").setFontColor("#ffcc04");
+    mtssSheet.autoResizeColumns(1, 6);
+  }
+  
+  // 7. Check_Connect_Logs sheet
+  var ccSheet = ss.getSheetByName(CONFIG.CC_SHEET_NAME);
+  if (!ccSheet) {
+    ccSheet = ss.insertSheet(CONFIG.CC_SHEET_NAME);
+    ccSheet.appendRow(["Timestamp", "Mentor Email", "Student Name", "Notes"]);
+    ccSheet.getRange(1, 1, 1, 4).setFontWeight("bold").setBackground("#0c2346").setFontColor("#ffcc04");
+    ccSheet.autoResizeColumns(1, 4);
+  }
+  
+  ui.alert(
+    "Initialization Success",
+    "All Copley PBIS 2026-2027 sheet templates have been initialized and verified!\n\n" +
+    "You are ready to paste your new rosters into 'Master_Roster' and 'Staff_Directory'. " +
+    "Be sure to update '_System_Config' with your Google Drive folder IDs and Google Slides IDs.",
+    ui.ButtonSet.OK
+  );
 }
 
 /**
@@ -2832,16 +3064,35 @@ function triggerLeaderboardSyncManual() {
 }
 
 /**
+ * Manual trigger for House Cup standings sync. Reads presentation ID from _System_Config sheet tab.
+ */
+function triggerHouseCupSyncManual() {
+  var sysConfig = getSystemConfig();
+  var houseCupId = sysConfig.HOUSE_CUP_SLIDES_PRESENTATION_ID;
+  
+  if (!houseCupId || houseCupId === "YOUR_HOUSE_CUP_SLIDES_PRESENTATION_ID_HERE" || houseCupId === "") {
+    SpreadsheetApp.getUi().alert("Error: No valid HOUSE_CUP_SLIDES_PRESENTATION_ID found in _System_Config sheet tab. Please configure it first.");
+    return;
+  }
+  
+  SpreadsheetApp.getActiveSpreadsheet().toast("Starting House Cup standings update...", "House Cup Sync", 3);
+  updateHouseCupStandingsSlides(houseCupId);
+  SpreadsheetApp.getActiveSpreadsheet().toast("House Cup standings update complete!", "House Cup Sync", 5);
+}
+
+/**
  * Triggers slides synchronization for all configured presentations.
  */
 function runSlidesSync(sysConfig) {
   var presentationId = sysConfig.SLIDES_PRESENTATION_ID;
   var staffPresentationId = sysConfig.STAFF_SLIDES_PRESENTATION_ID || sysConfig.STAFF_TO_STUDENT_SLIDES_ID;
   var leaderboardPresentationId = sysConfig.LEADERBOARD_SLIDES_PRESENTATION_ID;
+  var houseCupPresentationId = sysConfig.HOUSE_CUP_SLIDES_PRESENTATION_ID;
   
   var hasStudentDeck = (presentationId && presentationId !== "YOUR_SLIDES_PRESENTATION_ID_HERE" && presentationId !== "");
   var hasStaffDeck = (staffPresentationId && staffPresentationId !== "YOUR_STAFF_SLIDES_PRESENTATION_ID_HERE" && staffPresentationId !== "" && staffPresentationId !== presentationId);
   var hasLeaderboardDeck = (leaderboardPresentationId && leaderboardPresentationId !== "YOUR_LEADERBOARD_SLIDES_PRESENTATION_ID_HERE" && leaderboardPresentationId !== "");
+  var hasHouseCupDeck = (houseCupPresentationId && houseCupPresentationId !== "YOUR_HOUSE_CUP_SLIDES_PRESENTATION_ID_HERE" && houseCupPresentationId !== "");
   
   if (hasStudentDeck) {
     if (hasStaffDeck) {
@@ -2861,6 +3112,10 @@ function runSlidesSync(sysConfig) {
 
   if (hasLeaderboardDeck) {
     updateStaffLeaderboardSlides(leaderboardPresentationId);
+  }
+
+  if (hasHouseCupDeck) {
+    updateHouseCupStandingsSlides(houseCupPresentationId);
   }
 }
 

@@ -634,7 +634,8 @@ var mockSheets = {
   "_System_Config": [
     ["Setting Name", "Value"],
     ["SLIDES_PRESENTATION_ID", "mock-deck-id"],
-    ["LEADERBOARD_SLIDES_PRESENTATION_ID", "mock-leaderboard-deck-id"]
+    ["LEADERBOARD_SLIDES_PRESENTATION_ID", "mock-leaderboard-deck-id"],
+    ["HOUSE_CUP_SLIDES_PRESENTATION_ID", "mock-house-cup-deck-id"]
   ],
   "Form Responses 1": [
     ["Timestamp", "Email Address", "First Name", "Last Name", "Which staff member/teacher are you shouting out?", "Category", "Appreciation Message", "Anonymous"]
@@ -877,12 +878,12 @@ else:
     print("✅ Staff-to-student resolved points (20 points to Juniors) verified!")
 
 # 2. Slide count verification
-# 3 slides should be generated (2 shoutouts + 1 leaderboard)
-if test_4_results["generatedSlideCount"] != 3:
-    print(f"❌ Slide sync count mismatch. Expected: 3, Got: {test_4_results['generatedSlideCount']}")
+# 4 slides should be generated (2 shoutouts + 1 teacher leaderboard + 1 House Cup standing)
+if test_4_results["generatedSlideCount"] != 4:
+    print(f"❌ Slide sync count mismatch. Expected: 4, Got: {test_4_results['generatedSlideCount']}")
     t4_passed = False
 else:
-    print("✅ Slide sync checkbox gating and Monthly Teacher Leaderboard slides generation verified!")
+    print("✅ Slide sync checkbox gating, Monthly Teacher Leaderboard, and House Cup standings slides generation verified!")
 
 # 3. Placeholder replacements checks
 # Verify that TO and FROM are replaced correctly based on direction
