@@ -917,28 +917,36 @@ else:
 # Verify Monthly Staff Leaderboard slide placeholder replacements
 found_month = False
 found_t1_name = False
+found_t1_dept = False
 found_t1_count = False
 found_t2_name = False
+found_t2_dept = False
 
 for r in test_4_results["replacedTexts"]:
     if r["target"] == "{{MONTH}}" or r["target"] == "{{month}}":
         if r["val"] in ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]:
             found_month = True
     elif r["target"] == "{{T1_NAME}}" or r["target"] == "{{t1_name}}":
-        if r["val"] == "Sarah Janiga (Science)":
+        if r["val"] == "Sarah Janiga":
             found_t1_name = True
+    elif r["target"] == "{{T1_DEPT}}" or r["target"] == "{{t1_dept}}":
+        if r["val"] == "Science":
+            found_t1_dept = True
     elif r["target"] == "{{T1_COUNT}}" or r["target"] == "{{t1_count}}":
         if r["val"] == "2":
             found_t1_count = True
     elif r["target"] == "{{T2_NAME}}" or r["target"] == "{{t2_name}}":
         if r["val"] == "-":
             found_t2_name = True
+    elif r["target"] == "{{T2_DEPT}}" or r["target"] == "{{t2_dept}}":
+        if r["val"] == "-":
+            found_t2_dept = True
 
-if not (found_month and found_t1_name and found_t1_count and found_t2_name):
-    print("❌ Leaderboard placeholders error: Month, teacher name/dept, VSO count, or fallback placeholders not set correctly.")
+if not (found_month and found_t1_name and found_t1_dept and found_t1_count and found_t2_name and found_t2_dept):
+    print("❌ Leaderboard placeholders error: Month, teacher name, department, VSO count, or fallback placeholders not set correctly.")
     t4_passed = False
 else:
-    print("✅ Monthly Teacher Leaderboard placeholders replacement (top 5 ranks, counts, and month) verified!")
+    print("✅ Monthly Teacher Leaderboard placeholders replacement (top 5 ranks, departments, counts, and month) verified!")
 
 # 4. Auto-Approval Verification
 staff_vso_row = test_4_results["queue"][2]

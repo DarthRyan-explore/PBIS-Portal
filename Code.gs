@@ -2113,7 +2113,7 @@ function updateStaffLeaderboardSlides(presentationId) {
       return b.count - a.count;
     });
 
-    // Resolve departments and format names as "Name (Dept)"
+    // Resolve departments and format names
     var staffDirectory = getStaffDirectory();
     var formattedLeaderboard = [];
     for (var k = 0; k < leaderboard.length; k++) {
@@ -2123,7 +2123,8 @@ function updateStaffLeaderboardSlides(presentationId) {
         dept = staffDirectory[tName].dept;
       }
       formattedLeaderboard.push({
-        fullName: tName + " (" + dept + ")",
+        name: tName,
+        dept: dept,
         count: leaderboard[k].count
       });
     }
@@ -2152,7 +2153,9 @@ function updateStaffLeaderboardSlides(presentationId) {
 
     for (var rank = 1; rank <= 5; rank++) {
       var item = formattedLeaderboard[rank - 1];
-      placeholders["T" + rank + "_NAME"] = item ? item.fullName : "-";
+      placeholders["T" + rank + "_NAME"] = item ? item.name : "-";
+      placeholders["T" + rank + "_DEPT"] = item ? item.dept : "-";
+      placeholders["T" + rank + "_DEPARTMENT"] = item ? item.dept : "-";
       placeholders["T" + rank + "_COUNT"] = item ? item.count.toString() : "0";
     }
 
