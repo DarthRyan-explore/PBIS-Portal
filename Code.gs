@@ -308,9 +308,10 @@ function processShoutoutSubmission(values, isStaffForm, sheet) {
  * Increments house score inside master ledger sheet
  */
 function updateHouseCupLedger(ss, houseName, pointsToAdd) {
-  var ledgerSheet = ss.getSheetByName(CONFIG.LEDGER_SHEET_NAME);
+  var ledgerSheet = getLedgerSheet(ss);
   if (!ledgerSheet) {
-    ledgerSheet = ss.insertSheet(CONFIG.LEDGER_SHEET_NAME);
+    var sheetName = CONFIG.LEDGER_SHEET_NAME || "House_Cup_Totals";
+    ledgerSheet = ss.insertSheet(sheetName);
     ledgerSheet.appendRow(["House Name", "Total Points", "Last Updated"]);
     ledgerSheet.getRange(1, 1, 1, 3).setFontWeight("bold");
     ledgerSheet.appendRow(["Seniors", 0, new Date()]);
@@ -381,6 +382,23 @@ function getSystemConfig() {
   }
   
   return config;
+}
+
+/**
+ * Helper to fetch the ledger sheet tab dynamically (either "House_Cup_Totals" or "Copley_Cup_Totals").
+ *
+ * @param {Spreadsheet} ss The active Google Spreadsheet.
+ * @returns {Sheet} The resolved ledger sheet tab.
+ */
+function getLedgerSheet(ss) {
+  var sheet = ss.getSheetByName(CONFIG.LEDGER_SHEET_NAME);
+  if (!sheet) {
+    sheet = ss.getSheetByName("Copley_Cup_Totals");
+  }
+  if (!sheet) {
+    sheet = ss.getSheetByName("House_Cup_Totals");
+  }
+  return sheet;
 }
 
 /**
@@ -1161,7 +1179,7 @@ function compileStudentDigestHTML(studentName, praiseCount, shoutoutCount, weekl
     '        <table width="100%" cellpadding="0" cellspacing="0" border="0">',
     '          <tr>',
     '            <td width="28" valign="top" style="font-size: 16px; color: #0c2346; padding-bottom: 10px;">🏹</td>',
-    '            <td style="padding-bottom: 10px; color: #1e293b; font-weight: bold;">Here is your weekly summary of the Virtual Shout-Outs (VSOs) and points logged for the House Cup.</td>',
+    '            <td style="padding-bottom: 10px; color: #1e293b; font-weight: bold;">Here is your weekly summary of the Virtual Shout-Outs (VSOs) and points logged for the Copley Cup.</td>',
     '          </tr>',
     '          <tr>',
     '            <td width="28" valign="top" style="font-size: 16px; color: #0c2346;">🎡</td>',
@@ -1245,7 +1263,7 @@ function compileStudentDigestHTML(studentName, praiseCount, shoutoutCount, weekl
     var rowBg = isStudentHouse ? "#fbf8eb" : "#ffffff";
     var borderAccent = isStudentHouse ? "3px solid #ffcc04" : "1.5px solid #e2e8f0";
     var textWeight = isStudentHouse ? "font-weight: 900; color: #0c2346;" : "color: #36506e;";
-    var labelSuffix = isStudentHouse ? ' <span style="font-size: 10px; background-color: #ffcc04; color: #0c2346; padding: 2px 8px; border-radius: 4px; font-weight: 900; margin-left: 8px; text-transform: uppercase; display: inline-block; vertical-align: middle; border: 1.5px solid #0c2346;">🛡️ Your House</span>' : "";
+    var labelSuffix = isStudentHouse ? ' <span style="font-size: 10px; background-color: #ffcc04; color: #0c2346; padding: 2px 8px; border-radius: 4px; font-weight: 900; margin-left: 8px; text-transform: uppercase; display: inline-block; vertical-align: middle; border: 1.5px solid #0c2346;">🛡️ Your Grade</span>' : "";
     
     var pct = Math.round((house.points / maxPoints) * 100);
     pct = Math.max(8, Math.min(100, pct));
@@ -1277,7 +1295,7 @@ function compileStudentDigestHTML(studentName, praiseCount, shoutoutCount, weekl
   
   var scoreboardHeaderHtml = [
     '<div style="background-color: #0c2346; border-left: 6px solid #ffcc04; padding: 12px 18px; margin-top: 30px; margin-bottom: 15px; text-align: left; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">',
-    '  <h3 style="margin: 0; color: #ffffff; font-size: 20px; font-weight: 900; font-family: Arial, sans-serif; text-transform: uppercase; letter-spacing: 1px; line-height: 1.2;">🏆 House Cup Standings</h3>',
+    '  <h3 style="margin: 0; color: #ffffff; font-size: 20px; font-weight: 900; font-family: Arial, sans-serif; text-transform: uppercase; letter-spacing: 1px; line-height: 1.2;">🏆 Copley Cup Standings</h3>',
     '</div>'
   ].join('\n');
 
@@ -1938,21 +1956,32 @@ function updateFeaturedShoutOutSlides(presentationId, limit, filterDirection) {
       return;
     }
 
-    // Delete existing shout-out slides from previous runs to avoid growing indefinitely
-    // We keep all slides up to the template slide (inclusive)
-    var slidesToDelete = [];
-    var keepCount = templateIndex + 1;
-    for (var j = slides.length - 1; j >= keepCount; j--) {
-      slidesToDelete.push(slides[j]);
+    // Delete existing shout-out slides from previous runs using tags to support shared decks
+    for (var j = slides.length - 1; j >= 0; j--) {
+      var s = slides[j];
+      if (j === templateIndex) continue; // Safety: Never delete the template slide itself
+      try {
+        var notes = s.getNotesPage().getNotesBody().getText().asString();
+        if (notes.indexOf("[PBIS_SHOUTOUT]") !== -1) {
+          s.remove();
+        }
+      } catch (e) {
+        // If we fail to read notes, only delete if it's after the template and not in a shared deck setup
+        if (j > templateIndex && slides.length > 5) {
+          s.remove();
+        }
+      }
     }
-    slidesToDelete.forEach(function(s) {
-      s.remove();
-    });
 
     // Generate new slides by duplicating the template slide
     approvedShoutouts.forEach(function(shoutout) {
       var newSlide = deck.appendSlide(templateSlide);
       newSlide.setSkipped(false);
+      try {
+        newSlide.getNotesPage().getNotesBody().getText().setText("[PBIS_SHOUTOUT]");
+      } catch (e) {
+        Logger.log("Could not set speaker notes tag: " + e.toString());
+      }
       
       // Build dynamic placeholders dictionary supporting all variations/typos
       var placeholders = {
@@ -2132,19 +2161,30 @@ function updateStaffLeaderboardSlides(presentationId) {
       });
     }
 
-    // Delete any old generated leaderboard slides (keep only template slide at index 0)
-    var slidesToDelete = [];
-    var keepCount = templateIndex + 1;
-    for (var j = slides.length - 1; j >= keepCount; j--) {
-      slidesToDelete.push(slides[j]);
+    // Delete any old generated leaderboard slides using tags to support shared decks
+    for (var j = slides.length - 1; j >= 0; j--) {
+      var s = slides[j];
+      if (j === templateIndex) continue; // Safety: Never delete the template slide itself
+      try {
+        var notes = s.getNotesPage().getNotesBody().getText().asString();
+        if (notes.indexOf("[PBIS_LEADERBOARD]") !== -1) {
+          s.remove();
+        }
+      } catch (e) {
+        if (j > templateIndex && slides.length > 5) {
+          s.remove();
+        }
+      }
     }
-    slidesToDelete.forEach(function(s) {
-      s.remove();
-    });
 
     // Duplicate template slide
     var newSlide = deck.appendSlide(templateSlide);
     newSlide.setSkipped(false);
+    try {
+      newSlide.getNotesPage().getNotesBody().getText().setText("[PBIS_LEADERBOARD]");
+    } catch (e) {
+      Logger.log("Could not set speaker notes tag: " + e.toString());
+    }
 
     // Get current month name
     var monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -2211,7 +2251,7 @@ function updateHouseCupStandingsSlides(presentationId) {
 
     // Read points from House_Cup_Totals sheet
     var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var ledgerSheet = ss.getSheetByName(CONFIG.LEDGER_SHEET_NAME);
+    var ledgerSheet = getLedgerSheet(ss);
     if (!ledgerSheet) {
       Logger.log("Ledger sheet not found. Cannot calculate standings.");
       return;
@@ -2238,19 +2278,30 @@ function updateHouseCupStandingsSlides(presentationId) {
       return b.points - a.points;
     });
 
-    // Delete any old generated standings slides (keep only template slide at index 0)
-    var slidesToDelete = [];
-    var keepCount = templateIndex + 1;
-    for (var j = slides.length - 1; j >= keepCount; j--) {
-      slidesToDelete.push(slides[j]);
+    // Delete any old generated standings slides using tags to support shared decks
+    for (var j = slides.length - 1; j >= 0; j--) {
+      var s = slides[j];
+      if (j === templateIndex) continue; // Safety: Never delete the template slide itself
+      try {
+        var notes = s.getNotesPage().getNotesBody().getText().asString();
+        if (notes.indexOf("[PBIS_COPLEY_CUP]") !== -1) {
+          s.remove();
+        }
+      } catch (e) {
+        if (j > templateIndex && slides.length > 5) {
+          s.remove();
+        }
+      }
     }
-    slidesToDelete.forEach(function(s) {
-      s.remove();
-    });
 
     // Duplicate template slide
     var newSlide = deck.appendSlide(templateSlide);
     newSlide.setSkipped(false); // Force the duplicated slide to be visible
+    try {
+      newSlide.getNotesPage().getNotesBody().getText().setText("[PBIS_COPLEY_CUP]");
+    } catch (e) {
+      Logger.log("Could not set speaker notes tag: " + e.toString());
+    }
 
     // Build replacement placeholders
     var placeholders = {};
@@ -2616,7 +2667,7 @@ function getHouseStandings(ss) {
     "Freshmen": 0
   };
   
-  var ledgerSheet = ss.getSheetByName(CONFIG.LEDGER_SHEET_NAME);
+  var ledgerSheet = getLedgerSheet(ss);
   if (ledgerSheet) {
     var ledgerData = ledgerSheet.getDataRange().getValues();
     for (var i = 1; i < ledgerData.length; i++) {
@@ -2775,7 +2826,7 @@ function getPublicScoreboardData() {
     "Freshmen": 0
   };
   
-  var ledgerSheet = ss.getSheetByName(CONFIG.LEDGER_SHEET_NAME);
+  var ledgerSheet = getLedgerSheet(ss);
   if (ledgerSheet) {
     var ledgerData = ledgerSheet.getDataRange().getValues();
     for (var i = 1; i < ledgerData.length; i++) {
@@ -2848,7 +2899,7 @@ function onOpen() {
   ui.createMenu("🏹 PBIS Admin")
     .addItem("Sync TV Slides", "triggerSlidesSyncManual")
     .addItem("Sync Monthly Staff Leaderboard", "triggerLeaderboardSyncManual")
-    .addItem("Sync House Cup Standings", "triggerHouseCupSyncManual")
+    .addItem("Sync Copley Cup Standings", "triggerHouseCupSyncManual")
     .addItem("Send Friday Staff Digests Now", "sendWeeklyDigest")
     .addSeparator()
     .addItem("Preview Staff Digest Email", "sendTestDigestToMe")
@@ -2979,10 +3030,11 @@ function initializeDatabaseTemplates() {
     staffSheet.autoResizeColumns(1, 5);
   }
   
-  // 4. House_Cup_Totals sheet
-  var ledgerSheet = ss.getSheetByName(CONFIG.LEDGER_SHEET_NAME);
+  // 4. House_Cup_Totals / Copley_Cup_Totals sheet
+  var ledgerSheet = getLedgerSheet(ss);
   if (!ledgerSheet) {
-    ledgerSheet = ss.insertSheet(CONFIG.LEDGER_SHEET_NAME);
+    var sheetName = CONFIG.LEDGER_SHEET_NAME || "House_Cup_Totals";
+    ledgerSheet = ss.insertSheet(sheetName);
     ledgerSheet.appendRow(["House Name", "Total Points", "Last Updated"]);
     ledgerSheet.getRange(1, 1, 1, 3).setFontWeight("bold").setBackground("#0c2346").setFontColor("#ffcc04");
     ledgerSheet.appendRow(["Seniors", 0, new Date()]);

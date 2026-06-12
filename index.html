@@ -1054,7 +1054,7 @@
                 <div class="flex items-center gap-4">
                   <h3 class="text-sm font-black text-copley-blue heading-style flex items-center gap-2">
                     <i class="fa-solid fa-shield-halved text-copley-gold animate-pulse"></i>
-                    <span id="clashPanelTitle">Department House Cup</span>
+                    <span id="clashPanelTitle">Department Clash Standings</span>
                   </h3>
                 </div>
 
@@ -1910,7 +1910,7 @@
           <div class="flex items-center gap-1.5">
             <button id="snav-clash" onclick="switchStudentTab('clash')" class="flex items-center space-x-2 px-4 py-2.5 rounded-xl font-black transition-all duration-200 text-xs shadow-md bg-copley-blue text-copley-gold border border-copley-gold/20 select-none">
               <i class="fa-solid fa-trophy text-sm"></i>
-              <span>🏆 Copley House Cup</span>
+              <span>🏆 Copley Cup</span>
             </button>
             <button id="snav-raffle" onclick="switchStudentTab('raffle')" class="flex items-center space-x-2 px-4 py-2.5 rounded-xl font-bold transition-all duration-200 text-xs text-slate-650 hover:bg-slate-100 hover:text-copley-blue select-none">
               <i class="fa-solid fa-ticket text-sm"></i>
@@ -2215,9 +2215,9 @@
               <div>
                 <h3 class="text-sm font-black text-copley-blue heading-style flex items-center gap-2">
                   <i class="fa-solid fa-trophy text-copley-gold animate-bounce"></i>
-                  <span>🏆 Copley House Cup Standings</span>
+                  <span>🏆 Copley Cup Standings</span>
                 </h3>
-                <p class="text-xs text-slate-400 mt-1 font-semibold">Tied to class spirit points given out through the year. Watch the colorful house gems pile up in real-time!</p>
+                <p class="text-xs text-slate-400 mt-1 font-semibold">Tied to class spirit points given out through the year. Watch the colorful cohort gems pile up in real-time!</p>
               </div>
               <div class="flex items-center gap-2 z-10">
                 <span class="text-[9px] font-black bg-copley-blue text-copley-gold px-2.5 py-1 rounded-md uppercase tracking-wider heading-style">
@@ -2756,7 +2756,7 @@
               <span>📡 Scoreboard Live Sync API Configuration</span>
             </h3>
             <p class="text-[11px] text-slate-400 mb-4 font-semibold leading-relaxed">
-              Paste your published Google Apps Script Web App URL below to connect this web portal dynamically to your live Google Sheets backend. This will automatically pull the latest House Cup points and Department standings in real-time.
+              Paste your published Google Apps Script Web App URL below to connect this web portal dynamically to your live Google Sheets backend. This will automatically pull the latest Copley Cup points and Department standings in real-time.
             </p>
 
             <div class="space-y-3">
@@ -5114,7 +5114,7 @@
         btnClass.className = "px-3.5 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all text-slate-400 hover:text-slate-600 heading-style";
         areaDept.classList.remove('hidden');
         areaClass.classList.add('hidden');
-        if (panelTitle) panelTitle.innerText = "Department House Cup";
+        if (panelTitle) panelTitle.innerText = "Department Clash Standings";
       } else {
         btnClass.className = "px-3.5 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all bg-white text-copley-blue shadow-sm heading-style";
         btnDept.className = "px-3.5 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all text-slate-400 hover:text-slate-600 heading-style";
@@ -6114,7 +6114,7 @@
         { id: "default", name: "No Title", titleText: "", cost: 0, desc: "Clean, name-only badge layout." },
         { id: "scholar", name: "Copley Scholar", titleText: "Copley Scholar", cost: 2, desc: "Dedicated student committed to learning." },
         { id: "guru", name: "Gratitude Guru", titleText: "Gratitude Guru", cost: 0, reqVso: 3, desc: "FREE unlock after sending 3 gratitude virtual slips to staff!" },
-        { id: "spirit", name: "Spirit Leader", titleText: "Spirit Leader", cost: 3, desc: "A vocal advocate for graduating Copley House Cup points." },
+        { id: "spirit", name: "Spirit Leader", titleText: "Spirit Leader", cost: 3, desc: "A vocal advocate for graduating Copley Cup points." },
         { id: "trailblazer", name: "Quiet Achiever", titleText: "Quiet Achiever", cost: 3, desc: "For the unsung heroes of focus, care, and kindness." }
       ],
       themeBackdrop: [

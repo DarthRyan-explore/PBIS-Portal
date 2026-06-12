@@ -717,6 +717,20 @@ var SlidesApp = {
             remove: function() { deletedSlideCount++; },
             replaceAllText: function(target, val) {
               replacedTexts.push({ target: target, val: val });
+            },
+            getNotesPage: function() {
+              return {
+                getNotesBody: function() {
+                  return {
+                    getText: function() {
+                      return {
+                        setText: function(text) {},
+                        asString: function() { return ""; }
+                      };
+                    }
+                  };
+                }
+              };
             }
           }
         ];
@@ -727,7 +741,21 @@ var SlidesApp = {
           replaceAllText: function(target, val) {
             replacedTexts.push({ target: target, val: val });
           },
-          setSkipped: function(skipped) {}
+          setSkipped: function(skipped) {},
+          getNotesPage: function() {
+            return {
+              getNotesBody: function() {
+                return {
+                  getText: function() {
+                    return {
+                      setText: function(text) {},
+                      asString: function() { return ""; }
+                    };
+                  }
+                };
+              }
+            };
+          }
         };
       }
     };
