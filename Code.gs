@@ -22,6 +22,7 @@ var CONFIG = {
   EMAIL_SENDER_NAME: "Copley High School PBIS System",
   DENISE_FOLDER_ID: "YOUR_DENISE_FOLDER_ID_HERE", // Folder ID containing student caseload JSONs
   MTSS_FORM_URL: "https://docs.google.com/forms/d/e/1FAIpQLSdf_staff_mtss_log_form_placeholder/viewform", // URL to staff MTSS Tier 1 logging Google Form
+  LEADERBOARD_SLIDES_PRESENTATION_ID: "1CxXwvPcujycdqdDNTU4JKB_hWd9esbQB6Ao_4aBDH8s", // Default ID for the monthly staff VSO leaderboard slides
   DEBUG_MODE: true // SAFETY GATE: Set to true to prevent sending live emails during testing
 };
 
@@ -345,7 +346,8 @@ function getSystemConfig() {
   var config = {
     DENISE_FOLDER_ID: CONFIG.DENISE_FOLDER_ID,
     MTSS_FORM_URL: CONFIG.MTSS_FORM_URL,
-    STAFF_FORM_SHEET_NAME: CONFIG.STAFF_FORM_SHEET_NAME
+    STAFF_FORM_SHEET_NAME: CONFIG.STAFF_FORM_SHEET_NAME,
+    LEADERBOARD_SLIDES_PRESENTATION_ID: CONFIG.LEADERBOARD_SLIDES_PRESENTATION_ID
   };
   
   try {
@@ -1990,6 +1992,191 @@ function updateFeaturedShoutOutSlides(presentationId, limit, filterDirection) {
 }
 
 /**
+ * Calculates monthly VSO leaderboard and updates a Google Slides presentation template.
+ *
+ * @param {string} presentationId The Google Slides File ID.
+ */
+function updateStaffLeaderboardSlides(presentationId) {
+  if (!presentationId || presentationId === "YOUR_SLIDES_PRESENTATION_ID_HERE" || presentationId === "") {
+    Logger.log("Leaderboard Slides sync skipped: No presentationId provided.");
+    return;
+  }
+
+  try {
+    var deck = SlidesApp.openById(presentationId);
+    var slides = deck.getSlides();
+    if (slides.length === 0) {
+      Logger.log("Error: Leaderboard presentation is empty.");
+      return;
+    }
+
+    var sysConfig = getSystemConfig();
+    var templateIndex = 0; // The template slide is at index 0
+    if (sysConfig.LEADERBOARD_TEMPLATE_INDEX !== undefined && sysConfig.LEADERBOARD_TEMPLATE_INDEX !== "") {
+      templateIndex = parseInt(sysConfig.LEADERBOARD_TEMPLATE_INDEX);
+    }
+    var templateSlide = slides[templateIndex] || slides[0];
+
+    // Query data from Moderation Queue
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var modSheet = ss.getSheetByName(CONFIG.MODERATION_SHEET_NAME);
+    if (!modSheet) {
+      Logger.log("Moderation queue sheet not found. Cannot calculate leaderboard.");
+      return;
+    }
+
+    var data = modSheet.getDataRange().getValues();
+    if (data.length <= 1) {
+      Logger.log("No data in Moderation Queue.");
+      return;
+    }
+
+    var headers = data[0];
+    var timestampColIdx = 0;
+    var senderColIdx = 1;
+    var statusColIdx = 7;
+    var auditedByColIdx = 8;
+
+    for (var c = 0; c < headers.length; c++) {
+      var hName = headers[c] ? headers[c].toString().toLowerCase().trim() : "";
+      if (hName === "timestamp") {
+        timestampColIdx = c;
+      } else if (hName === "sender" || hName === "from") {
+        senderColIdx = c;
+      } else if (hName.indexOf("status") !== -1) {
+        statusColIdx = c;
+      } else if (hName.indexOf("audit") !== -1) {
+        if (hName.indexOf("by") !== -1 || hName.indexOf("auditor") !== -1 || hName.indexOf("operator") !== -1) {
+          auditedByColIdx = c;
+        }
+      }
+    }
+
+    // Determine current calendar month boundaries
+    var now = new Date();
+    var currentYear = now.getFullYear();
+    var currentMonth = now.getMonth(); // 0-11
+    
+    // Group and count
+    var counts = {};
+    for (var i = 1; i < data.length; i++) {
+      var statusVal = data[i][statusColIdx] ? data[i][statusColIdx].toString().trim().toLowerCase() : "";
+      if (statusVal !== "approved") {
+        continue;
+      }
+
+      // Check if it is within current month
+      var rowDateVal = data[i][timestampColIdx];
+      var rowDate = null;
+      if (rowDateVal instanceof Date) {
+        rowDate = rowDateVal;
+      } else if (rowDateVal) {
+        var cleanDateStr = rowDateVal.toString().trim();
+        if (cleanDateStr.indexOf("-") !== -1 && cleanDateStr.indexOf(" ") !== -1 && cleanDateStr.indexOf("T") === -1) {
+          cleanDateStr = cleanDateStr.replace(" ", "T");
+        }
+        rowDate = new Date(cleanDateStr);
+      }
+      
+      if (!rowDate || isNaN(rowDate.getTime())) {
+        continue;
+      }
+
+      if (rowDate.getFullYear() !== currentYear || rowDate.getMonth() !== currentMonth) {
+        continue;
+      }
+
+      // Must be a staff sender
+      var auditedBy = data[i][auditedByColIdx] ? data[i][auditedByColIdx].toString().trim() : "";
+      var sender = data[i][senderColIdx] ? data[i][senderColIdx].toString().trim() : "";
+      var isStaff = false;
+      if (auditedBy === "Auto-Approved (Staff)") {
+        isStaff = true;
+      } else {
+        var staffDirectory = getStaffDirectory();
+        if (sender && staffDirectory.hasOwnProperty(sender)) {
+          isStaff = true;
+        }
+      }
+
+      if (isStaff && sender) {
+        counts[sender] = (counts[sender] || 0) + 1;
+      }
+    }
+
+    // Sort leaderboard in descending order
+    var leaderboard = [];
+    for (var name in counts) {
+      leaderboard.push({ name: name, count: counts[name] });
+    }
+    leaderboard.sort(function(a, b) {
+      return b.count - a.count;
+    });
+
+    // Resolve departments and format names as "Name (Dept)"
+    var staffDirectory = getStaffDirectory();
+    var formattedLeaderboard = [];
+    for (var k = 0; k < leaderboard.length; k++) {
+      var tName = leaderboard[k].name;
+      var dept = "Staff";
+      if (staffDirectory[tName] && staffDirectory[tName].dept) {
+        dept = staffDirectory[tName].dept;
+      }
+      formattedLeaderboard.push({
+        fullName: tName + " (" + dept + ")",
+        count: leaderboard[k].count
+      });
+    }
+
+    // Delete any old generated leaderboard slides (keep only template slide at index 0)
+    var slidesToDelete = [];
+    var keepCount = templateIndex + 1;
+    for (var j = slides.length - 1; j >= keepCount; j--) {
+      slidesToDelete.push(slides[j]);
+    }
+    slidesToDelete.forEach(function(s) {
+      s.remove();
+    });
+
+    // Duplicate template slide
+    var newSlide = deck.appendSlide(templateSlide);
+
+    // Get current month name
+    var monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+    var currentMonthName = monthNames[currentMonth];
+
+    // Build replacement placeholders
+    var placeholders = {
+      "MONTH": currentMonthName
+    };
+
+    for (var rank = 1; rank <= 5; rank++) {
+      var item = formattedLeaderboard[rank - 1];
+      placeholders["T" + rank + "_NAME"] = item ? item.fullName : "-";
+      placeholders["T" + rank + "_COUNT"] = item ? item.count.toString() : "0";
+    }
+
+    // Replace text placeholders on the new slide
+    for (var key in placeholders) {
+      var val = placeholders[key];
+      var keyUpper = key.toUpperCase();
+      var keyLower = key.toLowerCase();
+
+      newSlide.replaceAllText("{{" + keyUpper + "}}", val);
+      newSlide.replaceAllText("{{" + keyLower + "}}", val);
+      newSlide.replaceAllText("{" + keyUpper + "}", val);
+      newSlide.replaceAllText("{" + keyLower + "}", val);
+      newSlide.replaceAllText("{{ " + keyUpper + " }}", val);
+      newSlide.replaceAllText("{{ " + keyLower + " }}", val);
+    }
+
+    Logger.log("Successfully updated monthly teacher VSO leaderboard slide!");
+  } catch (err) {
+    Logger.log("Failed to update Teacher Leaderboard Google Slides: " + err.toString());
+  }
+}
+
+/**
  * Looks up a student's Grade/House in the Master_Roster tab by email or name.
  * Supports auto-resolving columns based on spreadsheet headers.
  *
@@ -2556,6 +2743,7 @@ function onOpen() {
   var ui = SpreadsheetApp.getUi();
   ui.createMenu("🏹 PBIS Admin")
     .addItem("Sync Hallway TV Slides", "triggerSlidesSyncManual")
+    .addItem("Sync Monthly Staff Leaderboard", "triggerLeaderboardSyncManual")
     .addItem("Send Friday Staff Digests Now", "sendWeeklyDigest")
     .addSeparator()
     .addItem("Preview Staff Digest Email", "sendTestDigestToMe")
@@ -2622,14 +2810,33 @@ function triggerSlidesSyncManual() {
 }
 
 /**
+ * Manual trigger for Monthly Teacher Leaderboard sync. Reads presentation ID from _System_Config sheet tab.
+ */
+function triggerLeaderboardSyncManual() {
+  var sysConfig = getSystemConfig();
+  var leaderboardId = sysConfig.LEADERBOARD_SLIDES_PRESENTATION_ID;
+  
+  if (!leaderboardId || leaderboardId === "YOUR_LEADERBOARD_SLIDES_PRESENTATION_ID_HERE" || leaderboardId === "") {
+    SpreadsheetApp.getUi().alert("Error: No valid LEADERBOARD_SLIDES_PRESENTATION_ID found in _System_Config sheet tab. Please configure it first.");
+    return;
+  }
+  
+  SpreadsheetApp.getActiveSpreadsheet().toast("Starting Monthly Teacher Leaderboard update...", "Leaderboard Sync", 3);
+  updateStaffLeaderboardSlides(leaderboardId);
+  SpreadsheetApp.getActiveSpreadsheet().toast("Monthly Teacher Leaderboard update complete!", "Leaderboard Sync", 5);
+}
+
+/**
  * Triggers slides synchronization for all configured presentations.
  */
 function runSlidesSync(sysConfig) {
   var presentationId = sysConfig.SLIDES_PRESENTATION_ID;
   var staffPresentationId = sysConfig.STAFF_SLIDES_PRESENTATION_ID || sysConfig.STAFF_TO_STUDENT_SLIDES_ID;
+  var leaderboardPresentationId = sysConfig.LEADERBOARD_SLIDES_PRESENTATION_ID;
   
   var hasStudentDeck = (presentationId && presentationId !== "YOUR_SLIDES_PRESENTATION_ID_HERE" && presentationId !== "");
   var hasStaffDeck = (staffPresentationId && staffPresentationId !== "YOUR_STAFF_SLIDES_PRESENTATION_ID_HERE" && staffPresentationId !== "" && staffPresentationId !== presentationId);
+  var hasLeaderboardDeck = (leaderboardPresentationId && leaderboardPresentationId !== "YOUR_LEADERBOARD_SLIDES_PRESENTATION_ID_HERE" && leaderboardPresentationId !== "");
   
   if (hasStudentDeck) {
     if (hasStaffDeck) {
@@ -2645,6 +2852,10 @@ function runSlidesSync(sysConfig) {
     updateFeaturedShoutOutSlides(staffPresentationId, 15, "staff_to_student");
   } else {
     Logger.log("No valid slide presentations configured for sync.");
+  }
+
+  if (hasLeaderboardDeck) {
+    updateStaffLeaderboardSlides(leaderboardPresentationId);
   }
 }
 

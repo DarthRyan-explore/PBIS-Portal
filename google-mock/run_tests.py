@@ -633,7 +633,8 @@ var mockSheets = {
   ],
   "_System_Config": [
     ["Setting Name", "Value"],
-    ["SLIDES_PRESENTATION_ID", "mock-deck-id"]
+    ["SLIDES_PRESENTATION_ID", "mock-deck-id"],
+    ["LEADERBOARD_SLIDES_PRESENTATION_ID", "mock-leaderboard-deck-id"]
   ],
   "Form Responses 1": [
     ["Timestamp", "Email Address", "First Name", "Last Name", "Which staff member/teacher are you shouting out?", "Category", "Appreciation Message", "Anonymous"]
@@ -818,7 +819,8 @@ function runTest4() {
   replacedTexts = [];
   
   // Run slides sync
-  updateFeaturedShoutOutSlides("mock-deck-id", 10);
+  var sysConfig = getSystemConfig();
+  runSlidesSync(sysConfig);
   
   return JSON.stringify({
     ledger: mockSheets["House_Cup_Totals"],
@@ -874,12 +876,12 @@ else:
     print("✅ Staff-to-student resolved points (20 points to Juniors) verified!")
 
 # 2. Slide count verification
-# 2 slides should be generated (Luke Skywalker is excluded since Feature on TV is false)
-if test_4_results["generatedSlideCount"] != 2:
-    print(f"❌ Slide sync count mismatch. Expected: 2, Got: {test_4_results['generatedSlideCount']}")
+# 3 slides should be generated (2 shoutouts + 1 leaderboard)
+if test_4_results["generatedSlideCount"] != 3:
+    print(f"❌ Slide sync count mismatch. Expected: 3, Got: {test_4_results['generatedSlideCount']}")
     t4_passed = False
 else:
-    print("✅ Slide sync checkbox gating (excluding non-featured approved rows) verified!")
+    print("✅ Slide sync checkbox gating and Monthly Teacher Leaderboard slides generation verified!")
 
 # 3. Placeholder replacements checks
 # Verify that TO and FROM are replaced correctly based on direction
@@ -911,6 +913,32 @@ if not (found_ahsoka_to and found_ahsoka_from):
     t4_passed = False
 else:
     print("✅ Staff-to-student TO/FROM placeholder replacement verified!")
+
+# Verify Monthly Staff Leaderboard slide placeholder replacements
+found_month = False
+found_t1_name = False
+found_t1_count = False
+found_t2_name = False
+
+for r in test_4_results["replacedTexts"]:
+    if r["target"] == "{{MONTH}}" or r["target"] == "{{month}}":
+        if r["val"] in ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]:
+            found_month = True
+    elif r["target"] == "{{T1_NAME}}" or r["target"] == "{{t1_name}}":
+        if r["val"] == "Sarah Janiga (Science)":
+            found_t1_name = True
+    elif r["target"] == "{{T1_COUNT}}" or r["target"] == "{{t1_count}}":
+        if r["val"] == "2":
+            found_t1_count = True
+    elif r["target"] == "{{T2_NAME}}" or r["target"] == "{{t2_name}}":
+        if r["val"] == "-":
+            found_t2_name = True
+
+if not (found_month and found_t1_name and found_t1_count and found_t2_name):
+    print("❌ Leaderboard placeholders error: Month, teacher name/dept, VSO count, or fallback placeholders not set correctly.")
+    t4_passed = False
+else:
+    print("✅ Monthly Teacher Leaderboard placeholders replacement (top 5 ranks, counts, and month) verified!")
 
 # 4. Auto-Approval Verification
 staff_vso_row = test_4_results["queue"][2]
