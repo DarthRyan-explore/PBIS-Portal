@@ -1,0 +1,13 @@
+- [x] Declare config defaults and load system configs for form URLs and empty digest suppression in `Code.gs`
+- [x] Implement `resolveTeacherName` fuzzy matching in `Code.gs`
+- [x] Implement roster name collision detection (`hasRosterCollision`) in `Code.gs`
+- [x] Update `processShoutoutSubmission` to fuzzy resolve teacher names and handle roster collisions safely
+- [x] Track weekly VSOs sent by staff members in `sendWeeklyDigest`
+- [x] Implement `sendAdminDiagnosticReport` to compile health checks and email the advisor
+- [x] Update `sendWeeklyDigest` to send the Admin Diagnostic Report and support conditional empty suppression
+- [x] Refactor `compileStaffDigestHTML` to skip empty MTSS logs and show the "Culture of Gratitude" explainer for zero-activity staff
+- [x] Update `compileStudentDigestHTML` to point to the correct student-to-staff form URL (aligned with STUDENT_TO_STAFF_FORM_URL)
+- [x] Add toast warning in checkQueueSizeAndAlert() and administrative menu function for archiving moderation queue in `Code.gs`
+- [x] Update test runner stubs in `google-mock/run_tests.py` to cover toast/getUi and add assertions for typos, collisions, zero-activity digests, toast alerts, and archiving
+- [x] Run automated test runner via `python3 google-mock/run_tests.py` and verify all tests pass
+- [x] Update walkthrough documentation
