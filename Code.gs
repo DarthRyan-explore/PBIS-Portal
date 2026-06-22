@@ -7,7 +7,7 @@
  * 2. Click Extensions > Apps Script.
  * 3. Paste the contents of this file into the Code.gs editor.
  * 4. Set up an Installable Trigger for 'onFormSubmitTrigger' (Event source: From spreadsheet, Event type: On form submit).
- * 5. Set up a Time-driven Trigger for 'sendWeeklyDigest' (Weekly timer, every Friday, 3 PM to 4 PM).
+ * 5. Set up a Time-driven Trigger for 'sendWeeklyDigest' (Weekly timer, every Friday, 7 AM to 8 AM).
  */
 
 // Configuration Constants
@@ -22,10 +22,17 @@ var CONFIG = {
   EMAIL_SENDER_NAME: "Copley High School PBIS System",
   DENISE_FOLDER_ID: "YOUR_DENISE_FOLDER_ID_HERE", // Folder ID containing student caseload JSONs
   MTSS_FORM_URL: "https://docs.google.com/forms/d/e/1FAIpQLSdf_staff_mtss_log_form_placeholder/viewform", // URL to staff MTSS Tier 1 logging Google Form
+  STUDENT_TO_STAFF_FORM_URL: "https://docs.google.com/forms/d/e/1FAIpQLSc-mMpGNc6trvGiI6DjdDmcHuggaIPnEmJuSASUzSvyV2clBQ/viewform?usp=header",
+  STAFF_TO_STUDENT_FORM_URL: "https://docs.google.com/forms/d/e/1FAIpQLSfa_i5w4eCNPeWOztat9iUXrhXeyfSLw0KW7vZj0YS7n8uCsw/viewform?usp=header",
+  SUPPRESS_EMPTY_STAFF_DIGESTS: false,
+  ADMIN_EMAIL: "debbi.spangler@copley-fairlawn.org, ryan.lawrence@copley-fairlawn.org",
   LEADERBOARD_SLIDES_PRESENTATION_ID: "1CxXwvPcujycdqdDNTU4JKB_hWd9esbQB6Ao_4aBDH8s", // Default ID for the monthly staff VSO leaderboard slides
   HOUSE_CUP_SLIDES_PRESENTATION_ID: "YOUR_HOUSE_CUP_SLIDES_PRESENTATION_ID_HERE", // Default ID for the live House Cup standings slides
   DEBUG_MODE: true // SAFETY GATE: Set to true to prevent sending live emails during testing
 };
+
+// Global array to collect diagnostics and roster warning logs during script execution
+var scriptWarnings = [];
 
 // Hardcoded Student-to-House (Grade Cohort) mapping for validation/fallbacks
 var STUDENT_HOUSE_MAPPING = {
@@ -238,6 +245,54 @@ function processShoutoutSubmission(values, isStaffForm, sheet) {
     }
   }
   
+  // 1. Resolve student sender name from email if student-to-staff form (no typos, 100% correct)
+  if (!isStaffForm && email) {
+    var studentDirectory = getStudentDirectory();
+    for (var sName in studentDirectory) {
+      if (studentDirectory[sName].email && studentDirectory[sName].email.toLowerCase().trim() === email.toLowerCase().trim()) {
+        if (sender !== studentDirectory[sName].fullName) {
+          Logger.log("Resolved student sender name from email: '" + sender + "' -> '" + studentDirectory[sName].fullName + "'");
+          sender = studentDirectory[sName].fullName;
+        }
+        break;
+      }
+    }
+  }
+
+  // 2. Fuzzy resolve teacher name if student-to-staff form
+  if (!isStaffForm && teacher) {
+    var resolvedTeacher = resolveTeacherName(teacher, staffDirectory);
+    if (resolvedTeacher) {
+      if (resolvedTeacher !== teacher) {
+        var warnMsg = "Fuzzy corrected teacher name: '" + teacher + "' -> '" + resolvedTeacher + "'";
+        Logger.log(warnMsg);
+        scriptWarnings.push(warnMsg);
+        teacher = resolvedTeacher;
+      }
+    } else {
+      var warnMsg = "Could not resolve teacher name in staff directory: '" + teacher + "'";
+      Logger.log("WARNING: " + warnMsg);
+      scriptWarnings.push(warnMsg);
+    }
+  }
+
+  // 3. Fuzzy resolve student recipient name if staff-to-student form
+  if (isStaffForm && isStaffSender && teacher) {
+    var resolvedStudent = resolveStudentName(teacher);
+    if (resolvedStudent) {
+      if (resolvedStudent !== teacher) {
+        var warnMsg = "Fuzzy corrected student name: '" + teacher + "' -> '" + resolvedStudent + "'";
+        Logger.log(warnMsg);
+        scriptWarnings.push(warnMsg);
+        teacher = resolvedStudent;
+      }
+    } else {
+      var warnMsg = "Could not resolve student name in Master Roster: '" + teacher + "'";
+      Logger.log("WARNING: " + warnMsg);
+      scriptWarnings.push(warnMsg);
+    }
+  }
+  
   var house = "Freshmen";
   var points = 2; // Default student-to-staff points (sender gets 2 points)
   var status = "Pending";
@@ -248,14 +303,27 @@ function processShoutoutSubmission(values, isStaffForm, sheet) {
   if (isStaffForm) {
     if (isStaffSender) {
       // Valid Staff-to-Student Praise Slip
-      // Target is a student, we resolve their house by name
-      house = lookupStudentGrade("", teacher);
-      points = 10; // Student receiver gets 10 points
-      status = "Approved";
-      auditedBy = "Auto-Approved (Staff)";
-      auditDate = new Date();
-      featureOnTv = isConsentNo ? "No Consent" : false; // Force "No Consent" if teacher opted out!
-      Logger.log("Staff-to-Student VSO detected. Recipient: " + teacher + " (" + house + ") gets " + points + " house points (Auto-Approved).");
+      // Check for collision first
+      var collisionDetected = hasRosterCollision(teacher);
+      if (collisionDetected) {
+        house = "Freshmen";
+        points = 0;
+        status = "Pending Review (Roster Collision)";
+        auditedBy = "System Security (Duplicate Student Names)";
+        auditDate = new Date();
+        featureOnTv = "No Consent"; // Do not show on TV
+        var warnMsg = "Roster Collision: Student name '" + teacher + "' matches multiple records in Master_Roster. Slip placed in Pending Review (Roster Collision) for manual audit.";
+        Logger.log("WARNING: " + warnMsg);
+        scriptWarnings.push(warnMsg);
+      } else {
+        house = lookupStudentGrade("", teacher);
+        points = 10; // Student receiver gets 10 points
+        status = "Approved";
+        auditedBy = "Auto-Approved (Staff)";
+        auditDate = new Date();
+        featureOnTv = isConsentNo ? "No Consent" : false; // Force "No Consent" if teacher opted out!
+        Logger.log("Staff-to-Student VSO detected. Recipient: " + teacher + " (" + house + ") gets " + points + " house points (Auto-Approved).");
+      }
     } else {
       // Security warning: Student tried to spoof the staff form!
       status = "Rejected";
@@ -348,6 +416,10 @@ function getSystemConfig() {
   var config = {
     DENISE_FOLDER_ID: CONFIG.DENISE_FOLDER_ID,
     MTSS_FORM_URL: CONFIG.MTSS_FORM_URL,
+    STUDENT_TO_STAFF_FORM_URL: CONFIG.STUDENT_TO_STAFF_FORM_URL,
+    STAFF_TO_STUDENT_FORM_URL: CONFIG.STAFF_TO_STUDENT_FORM_URL,
+    SUPPRESS_EMPTY_STAFF_DIGESTS: CONFIG.SUPPRESS_EMPTY_STAFF_DIGESTS,
+    ADMIN_EMAIL: CONFIG.ADMIN_EMAIL,
     STAFF_FORM_SHEET_NAME: CONFIG.STAFF_FORM_SHEET_NAME,
     LEADERBOARD_SLIDES_PRESENTATION_ID: CONFIG.LEADERBOARD_SLIDES_PRESENTATION_ID,
     HOUSE_CUP_SLIDES_PRESENTATION_ID: CONFIG.HOUSE_CUP_SLIDES_PRESENTATION_ID
@@ -406,6 +478,7 @@ function getLedgerSheet(ss) {
  * Scheduled to run automatically on Friday afternoons
  */
 function sendWeeklyDigest() {
+  scriptWarnings = []; // Reset warnings for this execution run
   Logger.log("Compiling Weekly HTML Digests...");
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sysConfig = getSystemConfig();
@@ -460,6 +533,7 @@ function sendWeeklyDigest() {
   // Reset/Initialize weekly counters for staff
   for (var name in staffRecipients) {
     staffRecipients[name].received = 0;
+    staffRecipients[name].sent = 0;
   }
 
   // Count weekly shout-outs & collect messages
@@ -524,6 +598,9 @@ function sendWeeklyDigest() {
           resolvedStaffName = staffName;
           break;
         }
+      }
+      if (staffRecipients[resolvedStaffName]) {
+        staffRecipients[resolvedStaffName].sent = (staffRecipients[resolvedStaffName].sent || 0) + 1;
       }
       var dept = staffRecipients[resolvedStaffName] ? (staffRecipients[resolvedStaffName].dept || "General Staff") : "General Staff";
       deptPoints[dept] = (deptPoints[dept] || 0) + 10;
@@ -665,11 +742,17 @@ function sendWeeklyDigest() {
     var activeCaseloadCount = isTeacher ? (activeCaseloadSizes[staffName] || 0) : 0;
     var weeklyVSOs = teacherWeeklyVSOs[staffName] || [];
     var teacherDept = stats.dept || "General Staff";
+    var sentCount = stats.sent || 0;
     
     // RED TEAM FIX: Suppress zero-value digests during low activity or summer breaks to prevent staff email flooding
-    if (stats.received === 0 && activeCaseloadCount === 0 && weeklyVSOs.length === 0) {
-      Logger.log("Skipping empty weekly digest email for: " + stats.email);
-      continue;
+    var suppressConfig = sysConfig.SUPPRESS_EMPTY_STAFF_DIGESTS;
+    var suppressEmpty = (suppressConfig === true || suppressConfig === "true" || suppressConfig === "1" || suppressConfig === 1);
+    
+    if (stats.received === 0 && activeCaseloadCount === 0 && weeklyVSOs.length === 0 && sentCount === 0) {
+      if (suppressEmpty) {
+        Logger.log("Skipping empty weekly digest email for: " + stats.email + " (SUPPRESS_EMPTY_STAFF_DIGESTS is true)");
+        continue;
+      }
     }
     
     var htmlBody = compileStaffDigestHTML(
@@ -681,7 +764,8 @@ function sendWeeklyDigest() {
       outstandingList,
       weeklyVSOs,
       sortedDepts,
-      teacherDept
+      teacherDept,
+      sentCount
     );
     
     if (CONFIG.DEBUG_MODE) {
@@ -722,7 +806,11 @@ function sendWeeklyDigest() {
       parentEmail = sRecord.parentEmail;
     } else {
       studentHouse = STUDENT_HOUSE_MAPPING[sName] || "Freshmen";
-      Logger.log("WARNING: Student '" + sName + "' not found in Master_Roster. Email digest delivery skipped to prevent PII leakage to guessed address.");
+      var missingMsg = "Missing Roster Student: Student '" + sName + "' has weekly PBIS activity but was not found in the Master_Roster tab. Email digest delivery skipped to prevent PII leakage.";
+      Logger.log("WARNING: " + missingMsg);
+      if (typeof scriptWarnings !== 'undefined' && scriptWarnings) {
+        scriptWarnings.push(missingMsg);
+      }
       studentEmail = ""; // Set empty to skip sending and prevent wrong inbox deliveries
     }
     
@@ -781,6 +869,138 @@ function sendWeeklyDigest() {
   }
   
   Logger.log("Weekly Digest transmission complete. Total shout-outs parsed: " + weeklyShoutoutsCount);
+  
+  // 6. Gather any additional diagnostics and send the Admin Diagnostic Report
+  try {
+    // Check for pending collisions in the moderation queue
+    if (modSheet && modData.length > 1) {
+      var pendingCollisionsCount = 0;
+      for (var r = 1; r < modData.length; r++) {
+        var rowStatus = modData[r][statusColIdx] ? modData[r][statusColIdx].toString().trim() : "";
+        if (rowStatus.indexOf("Collision") !== -1) {
+          pendingCollisionsCount++;
+        }
+      }
+      if (pendingCollisionsCount > 0) {
+        scriptWarnings.push("Pending Collisions: There are " + pendingCollisionsCount + " praise slips in the moderation queue marked as 'Pending Review (Roster Collision)'. Please resolve them.");
+      }
+    }
+    
+    // Check for roster collisions (duplicate student names in the roster sheet tab)
+    var studentDir = getStudentDirectory(); // This will automatically add collision warnings to scriptWarnings!
+    
+    sendAdminDiagnosticReport(scriptWarnings);
+  } catch (diagErr) {
+    Logger.log("Error generating diagnostic report: " + diagErr.toString());
+  }
+}
+
+/**
+ * Emails a weekly system diagnostic and roster integrity report to the configured admin email.
+ */
+function sendAdminDiagnosticReport(warnings) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sysConfig = getSystemConfig();
+  var adminEmail = sysConfig.ADMIN_EMAIL || CONFIG.ADMIN_EMAIL || "debbi.spangler@copley-fairlawn.org";
+  
+  var modSheet = ss.getSheetByName(CONFIG.MODERATION_SHEET_NAME);
+  var queueSize = modSheet ? modSheet.getLastRow() - 1 : 0;
+  
+  // Check if queue has items older than 30 days
+  var hasOldItems = false;
+  if (modSheet && queueSize > 0) {
+    var data = modSheet.getDataRange().getValues();
+    var now = new Date();
+    var thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    for (var i = 1; i < data.length; i++) {
+      var ts = new Date(data[i][0]);
+      if (ts && !isNaN(ts.getTime()) && ts < thirtyDaysAgo) {
+        hasOldItems = true;
+        break;
+      }
+    }
+  }
+  
+  var warningListHtml = "";
+  if (warnings && warnings.length > 0) {
+    // De-duplicate warnings
+    var uniqueWarnings = [];
+    var seen = {};
+    for (var w = 0; w < warnings.length; w++) {
+      var msg = warnings[w];
+      if (!seen[msg]) {
+        seen[msg] = true;
+        uniqueWarnings.push(msg);
+      }
+    }
+    warningListHtml = uniqueWarnings.map(function(w) {
+      return '<li style="margin-bottom: 8px; color: #7f1d1d; background-color: #fef2f2; padding: 10px; border-left: 4px solid #ef4444; border-radius: 4px; font-family: Arial, sans-serif; font-size: 13px;">' + w + '</li>';
+    }).join('\n');
+  } else {
+    warningListHtml = '<li style="margin-bottom: 8px; color: #14532d; background-color: #f0fdf4; padding: 10px; border-left: 4px solid #22c55e; border-radius: 4px; font-family: Arial, sans-serif; font-size: 13px;">✓ All systems nominal. No roster conflicts or spelling discrepancies detected.</li>';
+  }
+  
+  var archivingAlertHtml = "";
+  if (queueSize > 200 || hasOldItems) {
+    archivingAlertHtml = [
+      '<div style="background-color: #fffbeb; border: 2px solid #f59e0b; border-left: 8px solid #f59e0b; padding: 15px; border-radius: 8px; margin-bottom: 20px;">',
+      '  <strong style="color: #78350f; font-size: 14px; display: block; margin-bottom: 5px;">⚠️ Archiving Recommendation</strong>',
+      '  <span style="color: #451a03; font-size: 13px; line-height: 1.5; display: block;">',
+      '    The Moderation Queue currently contains <strong>' + queueSize + '</strong> rows (some items are older than 30 days). ',
+      '    To keep the TV Slides Sync and Weekly Digests loading instantly, please archive approved/rejected rows to a backup sheet tab.',
+      '  </span>',
+      '</div>'
+    ].join('\n');
+  }
+  
+  var emailBody = [
+    '<div style="background-color: #f1f5f9; padding: 30px 10px; font-family: Arial, sans-serif;">',
+    '  <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border: 1px solid #cbd5e1; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">',
+    '    <!-- Header -->',
+    '    <div style="background-color: #0c2346; color: #ffffff; padding: 20px; border-bottom: 4px solid #ffcc04; text-align: center;">',
+    '      <h2 style="margin: 0; font-size: 18px; text-transform: uppercase; letter-spacing: 1px;">🏹 PBIS Admin Diagnostic Report</h2>',
+    '      <span style="font-size: 12px; color: #94a3b8; display: block; margin-top: 5px;">Copley High School PBIS System Integration</span>',
+    '    </div>',
+    '    ',
+    '    <!-- Content -->',
+    '    <div style="padding: 25px;">',
+    '      <p style="font-size: 14px; color: #334155; line-height: 1.5; margin-top: 0;">',
+    '        Hello PBIS Administrator,<br><br>',
+    '        The weekly PBIS diagnostic scanner completed its check of the roster, student directory, and recent form entries. Here is the summary:',
+    '      </p>',
+    '      ',
+    '      ' + archivingAlertHtml,
+    '      ',
+    '      <h3 style="font-size: 14px; text-transform: uppercase; color: #0c2346; margin: 20px 0 10px 0; border-bottom: 2px solid #cbd5e1; padding-bottom: 5px;">🔍 System Diagnostics & Warnings</h3>',
+    '      <ul style="margin: 0; padding: 0; list-style-type: none;">',
+    '        ' + warningListHtml,
+    '      </ul>',
+    '      ',
+    '      <div style="margin-top: 30px; background-color: #f8fafc; border: 1px solid #e2e8f0; padding: 15px; border-radius: 8px; font-size: 12px; color: #64748b; line-height: 1.5;">',
+    '        <strong>Roster Integrity Guide:</strong><br>',
+    '        • If duplicate student names are shown, please make sure they have distinct names (e.g. including middle initials) or unique emails in the <code>Master_Roster</code> sheet tab.<br>',
+    '        • If a student is not in the roster, their weekly email copy is skipped to prevent sending information to guessed address fallbacks, protecting student privacy (FERPA).',
+    '      </div>',
+    '    </div>',
+    '    ',
+    '    <!-- Footer -->',
+    '    <div style="background-color: #f8fafc; color: #94a3b8; font-size: 10px; text-align: center; padding: 15px; border-top: 1px solid #e2e8f0;">',
+    '      This is an automated system diagnostic email. Do not reply directly.',
+    '    </div>',
+    '  </div>',
+    '</div>'
+  ].join('\n');
+  
+  if (CONFIG.DEBUG_MODE) {
+    Logger.log("[DEBUG MODE] Would send diagnostic email to: " + adminEmail + " with " + warnings.length + " warnings.");
+  } else {
+    MailApp.sendEmail({
+      to: adminEmail,
+      subject: "Weekly PBIS System Diagnostic & Integrity Report 🏹",
+      htmlBody: emailBody,
+      name: CONFIG.EMAIL_SENDER_NAME
+    });
+  }
 }
 
 /**
@@ -827,10 +1047,11 @@ function getPreFilledFormUrl(s, sysConfig) {
 /**
  * Compiles a beautifully formatted Copley High School HTML newsletter for Staff
  */
-function compileStaffDigestHTML(name, praiseCount, mtssCount, isTeacher, activeCaseloadCount, outstandingStudents, weeklyVSOs, sortedDepts, teacherDept) {
+function compileStaffDigestHTML(name, praiseCount, mtssCount, isTeacher, activeCaseloadCount, outstandingStudents, weeklyVSOs, sortedDepts, teacherDept, sentCount) {
   isTeacher = isTeacher !== false; // Default to true if not specified
   activeCaseloadCount = activeCaseloadCount || 0;
   praiseCount = praiseCount || 0;
+  sentCount = sentCount || 0;
   weeklyVSOs = weeklyVSOs || [];
   sortedDepts = sortedDepts || [];
   teacherDept = teacherDept || "General Staff";
@@ -839,76 +1060,42 @@ function compileStaffDigestHTML(name, praiseCount, mtssCount, isTeacher, activeC
   var mtssSection = "";
   var sysConfig = getSystemConfig();
   
-  if (isTeacher) {
-    if (activeCaseloadCount === 0) {
-      var mtssNoCaseloads = [
-        "You currently have no students on your active Tier 1 caseload. You have successfully Matrix-dodged additional paperwork this week. Enjoy the peace while it lasts.",
-        "Your active caseload is currently empty. No strategy logging required. Go ahead and take credit for a job well done anyway.",
-        "No active caseload students assigned to you this week. Zero paperwork due. Have a relaxing, form-free weekend."
-      ];
-      var mtssNoCaseloadText = mtssNoCaseloads[Math.floor(Math.random() * mtssNoCaseloads.length)];
-      
-      mtssSection = [
-        '<div style="background-color: #ffffff; border: 3px solid #0c2346; border-top: 8px solid #64748b; border-radius: 16px; padding: 25px; margin-top: 25px; box-shadow: 0 6px 16px rgba(12,35,70,0.04);">',
-        '  <h3 style="color: #0c2346; margin: 0 0 12px 0; font-family: Arial, sans-serif; font-size: 15px; text-transform: uppercase; letter-spacing: 1px; font-weight: 900;">📋 MTSS Caseload: Empty</h3>',
-        '  <p style="color: #475569; font-size: 13px; margin: 0; line-height: 1.6; font-family: Arial, sans-serif;">',
-        '    ' + mtssNoCaseloadText,
-        '  </p>',
-        '</div>'
-      ].join('\n');
-    } else if (mtssCount > 0) {
-      var mtssWarnings = [
-        "Look, we all love paperwork. Okay, maybe not. But you currently have outstanding student MTSS Tier 1 strategy logs due. Let\'s get these documented so we can pretend we have our lives completely together.",
-        "A quick heads-up: there are outstanding MTSS Tier 1 strategy logs with your name on them. Let\'s get these filed before Denise has to hunt us down.",
-        "Friendly reminder (or as friendly as an automated bot can be): you have active caseload students missing their weekly MTSS log. Click below to make the red box go away.",
-        "Just a minor detail, but you\'ve got student MTSS logs outstanding this week. Take a quick moment to log them so we can keep the records clean and tidy."
-      ];
-      var mtssWarningText = mtssWarnings[Math.floor(Math.random() * mtssWarnings.length)];
-      
-      var studentRows = [];
-      (outstandingStudents || []).forEach(function(s) {
-        var preFilledUrl = getPreFilledFormUrl(s, sysConfig);
-        var triggerText = s.trigger || "Unknown";
-        studentRows.push(
-          '    <li style="margin-bottom: 14px; line-height: 1.5; color: #334155; list-style-position: inside;">',
-          '      <strong style="color: #0c2346; font-size: 13px;">' + s.name + '</strong> — <em style="color: #475569; font-size: 13px;">' + s.class + ' (' + s.mod + ')</em>',
-          '      <span style="font-size: 11px; color: #64748b; display: block; margin: 2px 0 6px 0; padding-left: 20px;">Referral: ' + triggerText + '</span>',
-          '      <div style="padding-left: 20px;">',
-          '        <a href="' + preFilledUrl + '" target="_blank" style="background-color: #be123c; color: #ffffff; padding: 6px 14px; text-decoration: none; border-radius: 6px; font-weight: 900; font-size: 10px; display: inline-block; text-transform: uppercase; letter-spacing: 0.8px; border: 1.5px solid #ffcc04; box-shadow: 0 2px 4px rgba(12,35,70,0.1);">Log Intervention</a>',
-          '      </div>',
-          '    </li>'
-        );
-      });
-      
-      mtssSection = [
-        '<div style="background-color: #ffffff; border: 3px solid #be123c; border-radius: 16px; padding: 25px; margin-top: 25px; box-shadow: 0 6px 16px rgba(190,18,60,0.06); border-top: 8px solid #be123c;">',
-        '  <h3 style="color: #be123c; margin: 0 0 12px 0; font-family: Arial, sans-serif; font-size: 15px; text-transform: uppercase; letter-spacing: 1px; font-weight: 900;">⚠️ MTSS Strategy Logs Outstanding</h3>',
-        '  <p style="color: #475569; font-size: 13px; margin: 0 0 16px 0; line-height: 1.6; font-family: Arial, sans-serif;">',
-        '    ' + mtssWarningText,
-        '  </p>',
-        '  <ul style="margin: 0; padding: 0; list-style-type: none;">',
-        studentRows.join('\n'),
-        '  </ul>',
-        '</div>'
-      ].join('\n');
-    } else {
-      var mtssClears = [
-        "Look at you. Zero outstanding MTSS logs. Go buy yourself a coffee, or take an extra long deep breath. You earned it.",
-        "MTSS status: clean. Zero outstanding logs. You are officially an overachiever. Keep it up.",
-        "No outstanding MTSS logs. Denise is happy, you\'re happy, I\'m happy. Well, as happy as code can get. Have a great weekend.",
-        "Zero outstanding MTSS logs due. Seriously, teach us your secrets. Have a relaxing weekend."
-      ];
-      var mtssClearText = mtssClears[Math.floor(Math.random() * mtssClears.length)];
-      
-      mtssSection = [
-        '<div style="background-color: #ffffff; border: 3px solid #16a34a; border-radius: 16px; padding: 25px; margin-top: 25px; box-shadow: 0 6px 16px rgba(22,163,74,0.04); border-top: 8px solid #16a34a;">',
-        '  <h3 style="color: #15803d; margin: 0 0 12px 0; font-family: Arial, sans-serif; font-size: 15px; text-transform: uppercase; letter-spacing: 1px; font-weight: 900;">✅ MTSS Review Status: Clear</h3>',
-        '  <p style="color: #475569; font-size: 13px; margin: 0; line-height: 1.6; font-family: Arial, sans-serif;">',
-        '    ' + mtssClearText,
-        '  </p>',
-        '</div>'
-      ].join('\n');
-    }
+  // Skip MTSS block entirely if mtssCount === 0. Show it only if isTeacher is true and there are outstanding logs.
+  if (isTeacher && mtssCount > 0) {
+    var mtssWarnings = [
+      "Look, we all love paperwork. Okay, maybe not. But you currently have outstanding student MTSS Tier 1 strategy logs due. Let's get these documented so we can pretend we have our lives completely together.",
+      "A quick heads-up: there are outstanding MTSS Tier 1 strategy logs with your name on them. Let's get these filed before Denise has to hunt us down.",
+      "Friendly reminder (or as friendly as an automated bot can be): you have active caseload students missing their weekly MTSS log. Click below to make the red box go away.",
+      "Just a minor detail, but you've got student MTSS logs outstanding this week. Take a quick moment to log them so we can keep the records clean and tidy."
+    ];
+    var mtssWarningText = mtssWarnings[Math.floor(Math.random() * mtssWarnings.length)];
+    
+    var studentRows = [];
+    (outstandingStudents || []).forEach(function(s) {
+      var preFilledUrl = getPreFilledFormUrl(s, sysConfig);
+      var triggerText = s.trigger || "Unknown";
+      studentRows.push(
+        '    <li style="margin-bottom: 14px; line-height: 1.5; color: #334155; list-style-position: inside;">',
+        '      <strong style="color: #0c2346; font-size: 13px;">' + s.name + '</strong> — <em style="color: #475569; font-size: 13px;">' + s.class + ' (' + s.mod + ')</em>',
+        '      <span style="font-size: 11px; color: #64748b; display: block; margin: 2px 0 6px 0; padding-left: 20px;">Referral: ' + triggerText + '</span>',
+        '      <div style="padding-left: 20px;">',
+        '        <a href="' + preFilledUrl + '" target="_blank" style="background-color: #be123c; color: #ffffff; padding: 6px 14px; text-decoration: none; border-radius: 6px; font-weight: 900; font-size: 10px; display: inline-block; text-transform: uppercase; letter-spacing: 0.8px; border: 1.5px solid #ffcc04; box-shadow: 0 2px 4px rgba(12,35,70,0.1);">Log Intervention</a>',
+        '      </div>',
+        '    </li>'
+      );
+    });
+    
+    mtssSection = [
+      '<div style="background-color: #ffffff; border: 3px solid #be123c; border-radius: 16px; padding: 25px; margin-top: 25px; box-shadow: 0 6px 16px rgba(190,18,60,0.06); border-top: 8px solid #be123c;">',
+      '  <h3 style="color: #be123c; margin: 0 0 12px 0; font-family: Arial, sans-serif; font-size: 15px; text-transform: uppercase; letter-spacing: 1px; font-weight: 900;">⚠️ MTSS Strategy Logs Outstanding</h3>',
+      '  <p style="color: #475569; font-size: 13px; margin: 0 0 16px 0; line-height: 1.6; font-family: Arial, sans-serif;">',
+      '    ' + mtssWarningText,
+      '  </p>',
+      '  <ul style="margin: 0; padding: 0; list-style-type: none;">',
+      studentRows.join('\n'),
+      '  </ul>',
+      '</div>'
+    ].join('\n');
   }
 
   // Witty greeting sentences (Ryan Reynolds style)
@@ -916,10 +1103,10 @@ function compileStaffDigestHTML(name, praiseCount, mtssCount, isTeacher, activeC
   if (praiseCount > 0) {
     greetings = [
       "Hey " + name + ". Look at that, you made it to Friday. And turns out, people actually noticed you doing great things this week. You received " + praiseCount + " Shout-Out(s).",
-      "Well " + name + ", another week down. The good news? You\'ve got some fan mail. " + praiseCount + " Shout-Out(s), to be exact.",
+      "Well " + name + ", another week down. The good news? You've got some fan mail. " + praiseCount + " Shout-Out(s), to be exact.",
       "Hey " + name + ". Grab a coffee and sit down. We compiled your weekly appreciation digest, and you actually did pretty great (contributing +" + weeklyPoints + " points to the " + teacherDept + " department).",
-      "Hey " + name + ". Good news: you got " + praiseCount + " Shout-Out(s) this week. Bad news: I still don\'t have a coffee for you. But hey, take the win.",
-      "Well, " + name + ", you did it. You survived the week, and you actually managed to inspire some students. You\'ve got " + praiseCount + " Shout-Out(s) waiting."
+      "Hey " + name + ". Good news: you got " + praiseCount + " Shout-Out(s) this week. Bad news: I still don't have a coffee for you. But hey, take the win.",
+      "Well, " + name + ", you did it. You survived the week, and you actually managed to inspire some students. You've got " + praiseCount + " Shout-Out(s) waiting."
     ];
   } else {
     greetings = [
@@ -1056,6 +1243,40 @@ function compileStaffDigestHTML(name, praiseCount, mtssCount, isTeacher, activeC
     '      </div>'
   ].join('\n');
 
+  var contentHtml = "";
+  var hasNoActivity = (praiseCount === 0 && weeklyVSOs.length === 0 && mtssCount === 0 && sentCount === 0);
+  
+  if (hasNoActivity) {
+    var staffPraiseFormUrl = sysConfig.STAFF_TO_STUDENT_FORM_URL || "https://docs.google.com/forms/d/e/1FAIpQLSfa_i5w4eCNPeWOztat9iUXrhXeyfSLw0KW7vZj0YS7n8uCsw/viewform?usp=header";
+    contentHtml = [
+      '      <!-- Culture of Gratitude Card -->',
+      '      <div style="background-color: #ffffff; border: 3px solid #0c2346; border-radius: 16px; padding: 25px; margin-top: 25px; margin-bottom: 25px; box-shadow: 0 6px 16px rgba(12,35,70,0.06); border-top: 8px solid #ffcc04;">',
+      '        <span style="font-size: 32px; display: block; text-align: center; margin-bottom: 10px;">🌱</span>',
+      '        <h4 style="margin: 0 0 10px 0; font-weight: 900; color: #0c2346; font-size: 16px; text-transform: uppercase; letter-spacing: 1px; font-family: Arial, sans-serif; text-align: center;">The Culture of Gratitude</h4>',
+      '        <p style="margin: 0 0 20px 0; font-size: 13px; color: #475569; line-height: 1.6; font-family: Arial, sans-serif; text-align: left;">',
+      '          Positivity at Copley High School starts with us. Even if you do not interact with students in the classroom every day, a simple word of encouragement can transform a student\'s week. Virtual Shout-Outs (VSOs) are a quick way to show students and colleagues that their hard work, kindness, or positive attitude is noticed. Gratitude is contagious—let\'s spread it together.',
+      '        </p>',
+      '        <div style="text-align: center;">',
+      '          <a href="' + staffPraiseFormUrl + '" target="_blank" style="background-color: #0c2346; color: #ffffff; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: 900; font-size: 12px; text-transform: uppercase; display: inline-block; border: 3px solid #ffcc04; letter-spacing: 1px; box-shadow: 0 4px 10px rgba(12,35,70,0.15); font-family: Arial, sans-serif;">🏹 Send a Shout-Out to a Student</a>',
+      '        </div>',
+      '      </div>'
+    ].join('\n');
+  } else {
+    var staffPraiseFormUrl = sysConfig.STAFF_TO_STUDENT_FORM_URL || "https://docs.google.com/forms/d/e/1FAIpQLSfa_i5w4eCNPeWOztat9iUXrhXeyfSLw0KW7vZj0YS7n8uCsw/viewform?usp=header";
+    var staffPraiseBtnHtml = [
+      '      <div style="margin-top: 25px; text-align: center;">',
+      '        <a href="' + staffPraiseFormUrl + '" target="_blank" style="background-color: #0c2346; color: #ffffff; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: 900; font-size: 12px; text-transform: uppercase; display: inline-block; border: 3px solid #ffcc04; letter-spacing: 1px; box-shadow: 0 4px 10px rgba(12,35,70,0.15); font-family: Arial, sans-serif;">🏹 Send a Shout-Out to a Student</a>',
+      '      </div>'
+    ].join('\n');
+    
+    contentHtml = [
+      dashboardHtml,
+      vsoSection,
+      mtssSection,
+      staffPraiseBtnHtml
+    ].join('\n');
+  }
+
   var html = [
     '<div style="background-color: #eef2f6; padding: 30px 10px; font-family: Arial, Helvetica, sans-serif;">',
     '  <div style="max-width: 650px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 12px rgba(12,35,70,0.05); background-color: #ffffff;">',
@@ -1073,15 +1294,11 @@ function compileStaffDigestHTML(name, praiseCount, mtssCount, isTeacher, activeC
     '        Here is your weekly summary of the Virtual Shout-Outs (VSOs) and points logged. Students who sent or received a Shout-Out are eligible to spin the PBIS prize wheel in the commons today (Friday) for some glorious rewards.',
     '      </p>',
     '      ',
-    '      ' + dashboardHtml,
-    '      ',
-    '      ' + vsoSection,
-    '      ',
-    '      ' + mtssSection,
+    '      ' + contentHtml,
     '      ',
     '      ' + scoreboardSection,
     '      ',
-    actionButtonHtml,
+    '      ' + actionButtonHtml,
     '    </div>',
     '    ',
     '    <!-- Footer -->',
@@ -1318,7 +1535,7 @@ function compileStudentDigestHTML(studentName, praiseCount, shoutoutCount, weekl
     ].join('\n');
   }
 
-  var studentShoutoutUrl = sysConfig.STUDENT_SHOUTOUT_FORM_URL || "https://docs.google.com/forms/d/e/1FAIpQLSdf_student_shoutout_form_placeholder/viewform";
+  var studentShoutoutUrl = sysConfig.STUDENT_TO_STAFF_FORM_URL || CONFIG.STUDENT_TO_STAFF_FORM_URL || "https://docs.google.com/forms/d/e/1FAIpQLSc-mMpGNc6trvGiI6DjdDmcHuggaIPnEmJuSASUzSvyV2clBQ/viewform?usp=header";
   var sendShoutoutButtonHtml = [
     '      <div style="margin-top: 25px; text-align: center;">',
     '        <a href="' + studentShoutoutUrl + '" target="_blank" style="background-color: #0c2346; color: #ffffff; padding: 16px 32px; text-decoration: none; border-radius: 8px; font-weight: 900; font-size: 13px; text-transform: uppercase; display: inline-block; border: 3px solid #ffcc04; letter-spacing: 1.5px; width: 90%; max-width: 450px; box-shadow: 0 4px 12px rgba(12,35,70,0.2); font-family: Arial, sans-serif;">🏹 Send a Shout-Out to a Teacher or Staff Member</a>',
@@ -2735,7 +2952,11 @@ function getStudentDirectory() {
     
     if (fullName) {
       if (studentDir.hasOwnProperty(fullName)) {
-        Logger.log("CRITICAL SYSTEM ALERT: Duplicate student name '" + fullName + "' detected in Master_Roster. Data leak risk between " + studentDir[fullName].email + " and " + email + ". System requires unique IDs.");
+        var collisionMsg = "Roster Name Collision: Student '" + studentDir[fullName].fullName + "' is listed multiple times in the Master_Roster tab (with emails: " + studentDir[fullName].email + " and " + email + ").";
+        Logger.log("CRITICAL SYSTEM ALERT: " + collisionMsg);
+        if (typeof scriptWarnings !== 'undefined' && scriptWarnings) {
+          scriptWarnings.push(collisionMsg);
+        }
       }
       studentDir[fullName] = {
         firstName: fName,
@@ -2997,6 +3218,8 @@ function onOpen() {
     .addItem("Sync Copley Cup Standings", "triggerHouseCupSyncManual")
     .addItem("Send Friday Staff Digests Now", "sendWeeklyDigest")
     .addSeparator()
+    .addItem("Archive Processed Queue Rows", "archiveModerationQueueManual")
+    .addSeparator()
     .addItem("Preview Staff Digest Email", "sendTestDigestToMe")
     .addItem("Preview Student Digest Email", "testSendStudentDigest")
     .addItem("Preview Parent Digest Email", "testSendParentDigest")
@@ -3004,6 +3227,82 @@ function onOpen() {
     .addItem("Trigger Setup Guide / Diagnostics", "showTriggerSetupGuide")
     .addItem("Create/Verify Database Sheet Templates", "initializeDatabaseTemplates")
     .addToUi();
+    
+  checkQueueSizeAndAlert();
+}
+
+/**
+ * Checks the size of the curation queue and alerts the admin if it exceeds 200 rows.
+ */
+function checkQueueSizeAndAlert() {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var modSheet = ss.getSheetByName(CONFIG.MODERATION_SHEET_NAME);
+    if (modSheet) {
+      var queueSize = modSheet.getLastRow() - 1;
+      if (queueSize > 200) {
+        ss.toast("Moderation queue currently contains " + queueSize + " rows. Please archive old entries using: 🏹 PBIS Admin -> Archive Processed Queue Rows.", "Queue Archiving Alert", 10);
+      }
+    }
+  } catch (err) {
+    if (typeof Logger !== 'undefined') {
+      Logger.log("Error checking queue size: " + err.toString());
+    }
+  }
+}
+
+/**
+ * Administrative action to archive processed Approved and Rejected rows from the active moderation queue.
+ */
+function archiveModerationQueueManual() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var modSheet = ss.getSheetByName(CONFIG.MODERATION_SHEET_NAME);
+  if (!modSheet) {
+    SpreadsheetApp.getUi().alert("Error: Moderation Queue sheet not found.");
+    return;
+  }
+  
+  var data = modSheet.getDataRange().getValues();
+  if (data.length <= 1) {
+    SpreadsheetApp.getUi().alert("Moderation Queue is empty.");
+    return;
+  }
+  
+  var archiveSheetName = CONFIG.MODERATION_SHEET_NAME + "_Archive";
+  var archiveSheet = ss.getSheetByName(archiveSheetName);
+  if (!archiveSheet) {
+    archiveSheet = ss.insertSheet(archiveSheetName);
+    archiveSheet.appendRow(data[0]); // Copy headers
+    try {
+      archiveSheet.getRange(1, 1, 1, 12).setFontWeight("bold").setBackground("#0c2346").setFontColor("#ffcc04");
+    } catch (err) {
+      Logger.log("Could not style header: " + err.toString());
+    }
+  }
+  
+  var ui = SpreadsheetApp.getUi();
+  var response = ui.alert(
+    "Archive Processed Rows",
+    "Are you sure you want to move all Approved and Rejected slips to the archive sheet '" + archiveSheetName + "'? This will clean up the active curation list.",
+    ui.ButtonSet.YES_NO
+  );
+  
+  if (response !== ui.Button.YES) {
+    return;
+  }
+  
+  var rowsArchived = 0;
+  // Deleting rows backwards so we don't mess up indexing
+  for (var i = data.length - 1; i >= 1; i--) {
+    var status = data[i][7] ? data[i][7].toString().trim() : "";
+    if (status === "Approved" || status === "Rejected" || status.indexOf("Collision") !== -1) {
+      archiveSheet.appendRow(data[i]);
+      modSheet.deleteRow(i + 1);
+      rowsArchived++;
+    }
+  }
+  
+  ui.alert("Success", "Successfully archived " + rowsArchived + " processed rows to '" + archiveSheetName + "'.", ui.ButtonSet.OK);
 }
 
 /**
@@ -3032,7 +3331,7 @@ function showTriggerSetupGuide() {
     "3. Weekly Timer Trigger (For Friday digest emails):",
     "   - Function: sendWeeklyDigest",
     "   - Event Source: Time-driven",
-    "   - Type: Weekly timer (Every Friday, 3:00 PM to 4:00 PM)",
+    "   - Type: Weekly timer (Every Friday, 7:00 AM to 8:00 AM)",
     "",
     "===========================================================",
     "Note: To configure these triggers, click the clock icon (Triggers) in the left panel of this editor, click '+ Add Trigger', and select the settings above.",
@@ -3231,38 +3530,51 @@ function triggerHouseCupSyncManual() {
  * Triggers slides synchronization for all configured presentations.
  */
 function runSlidesSync(sysConfig) {
-  var presentationId = sysConfig.SLIDES_PRESENTATION_ID;
-  var staffPresentationId = sysConfig.STAFF_SLIDES_PRESENTATION_ID || sysConfig.STAFF_TO_STUDENT_SLIDES_ID;
-  var leaderboardPresentationId = sysConfig.LEADERBOARD_SLIDES_PRESENTATION_ID;
-  var houseCupPresentationId = sysConfig.HOUSE_CUP_SLIDES_PRESENTATION_ID;
+  var lock = LockService.getDocumentLock();
+  try {
+    // Wait up to 30 seconds for any concurrent slide sync to complete
+    lock.waitLock(30000);
+  } catch (e) {
+    Logger.log("Could not acquire document lock for slide sync: " + e.toString());
+    return;
+  }
   
-  var hasStudentDeck = (presentationId && presentationId !== "YOUR_SLIDES_PRESENTATION_ID_HERE" && presentationId !== "");
-  var hasStaffDeck = (staffPresentationId && staffPresentationId !== "YOUR_STAFF_SLIDES_PRESENTATION_ID_HERE" && staffPresentationId !== "" && staffPresentationId !== presentationId);
-  var hasLeaderboardDeck = (leaderboardPresentationId && leaderboardPresentationId !== "YOUR_LEADERBOARD_SLIDES_PRESENTATION_ID_HERE" && leaderboardPresentationId !== "");
-  var hasHouseCupDeck = (houseCupPresentationId && houseCupPresentationId !== "YOUR_HOUSE_CUP_SLIDES_PRESENTATION_ID_HERE" && houseCupPresentationId !== "");
-  
-  if (hasStudentDeck) {
-    if (hasStaffDeck) {
-      // Sync student-to-staff to main presentation, staff-to-student to staff presentation
-      updateFeaturedShoutOutSlides(presentationId, 15, "student_to_staff");
+  try {
+    var presentationId = sysConfig.SLIDES_PRESENTATION_ID;
+    var staffPresentationId = sysConfig.STAFF_SLIDES_PRESENTATION_ID || sysConfig.STAFF_TO_STUDENT_SLIDES_ID;
+    var leaderboardPresentationId = sysConfig.LEADERBOARD_SLIDES_PRESENTATION_ID;
+    var houseCupPresentationId = sysConfig.HOUSE_CUP_SLIDES_PRESENTATION_ID;
+    
+    var hasStudentDeck = (presentationId && presentationId !== "YOUR_SLIDES_PRESENTATION_ID_HERE" && presentationId !== "");
+    var hasStaffDeck = (staffPresentationId && staffPresentationId !== "YOUR_STAFF_SLIDES_PRESENTATION_ID_HERE" && staffPresentationId !== "" && staffPresentationId !== presentationId);
+    var hasLeaderboardDeck = (leaderboardPresentationId && leaderboardPresentationId !== "YOUR_LEADERBOARD_SLIDES_PRESENTATION_ID_HERE" && leaderboardPresentationId !== "");
+    var hasHouseCupDeck = (houseCupPresentationId && houseCupPresentationId !== "YOUR_HOUSE_CUP_SLIDES_PRESENTATION_ID_HERE" && houseCupPresentationId !== "");
+    
+    if (hasStudentDeck) {
+      if (hasStaffDeck) {
+        // Sync student-to-staff to main presentation, staff-to-student to staff presentation
+        updateFeaturedShoutOutSlides(presentationId, 15, "student_to_staff");
+        updateFeaturedShoutOutSlides(staffPresentationId, 15, "staff_to_student");
+      } else {
+        // Sync all to the same presentation
+        updateFeaturedShoutOutSlides(presentationId, 15);
+      }
+    } else if (hasStaffDeck) {
+      // Sync only staff-to-student
       updateFeaturedShoutOutSlides(staffPresentationId, 15, "staff_to_student");
     } else {
-      // Sync all to the same presentation
-      updateFeaturedShoutOutSlides(presentationId, 15);
+      Logger.log("No valid slide presentations configured for sync.");
     }
-  } else if (hasStaffDeck) {
-    // Sync only staff-to-student
-    updateFeaturedShoutOutSlides(staffPresentationId, 15, "staff_to_student");
-  } else {
-    Logger.log("No valid slide presentations configured for sync.");
-  }
-
-  if (hasLeaderboardDeck) {
-    updateStaffLeaderboardSlides(leaderboardPresentationId);
-  }
-
-  if (hasHouseCupDeck) {
-    updateHouseCupStandingsSlides(houseCupPresentationId);
+  
+    if (hasLeaderboardDeck) {
+      updateStaffLeaderboardSlides(leaderboardPresentationId);
+    }
+  
+    if (hasHouseCupDeck) {
+      updateHouseCupStandingsSlides(houseCupPresentationId);
+    }
+  } finally {
+    lock.releaseLock();
   }
 }
 
@@ -3358,6 +3670,200 @@ function onEditTrigger(e) {
       }
     }
   }
+}
+
+/**
+ * Calculates Levenshtein distance between two strings to resolve spelling typos.
+ */
+function levenshteinDistance(s1, s2) {
+  var track = Array(s2.length + 1).fill(null).map(function() { return Array(s1.length + 1).fill(null); });
+  for (var i = 0; i <= s1.length; i += 1) track[0][i] = i;
+  for (var j = 0; j <= s2.length; j += 1) track[j][0] = j;
+  for (var j = 1; j <= s2.length; j += 1) {
+    for (var i = 1; i <= s1.length; i += 1) {
+      var indicator = s1[i - 1] === s2[j - 1] ? 0 : 1;
+      track[j][i] = Math.min(
+        track[j - 1][i] + 1, // deletion
+        track[j][i - 1] + 1, // insertion
+        track[j - 1][i - 1] + indicator // substitution
+      );
+    }
+  }
+  return track[s2.length][s1.length];
+}
+
+/**
+ * Resolves a student name typo dynamically by finding the closest match in Master_Roster.
+ */
+function resolveStudentName(name) {
+  if (!name) return null;
+  var cleanName = name.trim().toLowerCase().replace(/\s+/g, " ");
+  
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var rosterSheet = ss.getSheetByName("Master_Roster");
+  if (!rosterSheet) return null;
+  
+  var data = rosterSheet.getDataRange().getValues();
+  if (data.length <= 1) return null;
+  
+  var headers = data[0];
+  var firstCol = -1;
+  var lastCol = -1;
+  for (var c = 0; c < headers.length; c++) {
+    var h = headers[c].toString().toLowerCase().trim();
+    if (h.indexOf("first") !== -1) firstCol = c;
+    else if (h.indexOf("last") !== -1) lastCol = c;
+  }
+  if (firstCol === -1) firstCol = 0;
+  if (lastCol === -1) lastCol = 1;
+  
+  var bestMatch = null;
+  var minDistance = 999;
+  
+  for (var r = 1; r < data.length; r++) {
+    var fName = data[r][firstCol] ? data[r][firstCol].toString().trim() : "";
+    var lName = data[r][lastCol] ? data[r][lastCol].toString().trim() : "";
+    var fullName = (fName + " " + lName).trim();
+    var cleanFullName = fullName.toLowerCase();
+    
+    if (cleanFullName === cleanName) {
+      return fullName; // Exact match
+    }
+    
+    var dist = levenshteinDistance(cleanName, cleanFullName);
+    if (dist < minDistance) {
+      minDistance = dist;
+      bestMatch = fullName;
+    }
+  }
+  
+  // Accept the closest match if distance is within 25% of character length
+  var threshold = Math.max(2, Math.floor(cleanName.length * 0.25));
+  if (minDistance <= threshold) {
+    Logger.log("Fuzzy match resolved student: '" + name + "' -> '" + bestMatch + "' (distance: " + minDistance + ")");
+    return bestMatch;
+  }
+  
+  return null;
+}
+
+/**
+ * Resolves a teacher name typo dynamically by finding the closest match in the Staff Directory.
+ * Supports substring matching, stripping title honorifics, and Levenshtein distance fallback.
+ */
+function resolveTeacherName(name, staffDirectory) {
+  if (!name) return null;
+  var cleanName = name.trim().toLowerCase().replace(/\s+/g, " ");
+  
+  // 1. Exact or case-insensitive match
+  for (var sName in staffDirectory) {
+    if (sName.toLowerCase() === cleanName) {
+      return sName;
+    }
+  }
+  
+  // 2. Substring/last name match (e.g. "Mrs. Janiga" should match "Sarah Janiga")
+  // Strip common honorifics
+  var strippedName = cleanName.replace(/^(mr|mrs|ms|dr|officer|coach)\.?\s+/i, "");
+  var nameParts = strippedName.split(" ");
+  var lastWord = nameParts[nameParts.length - 1];
+  
+  var substringMatches = [];
+  for (var sName in staffDirectory) {
+    var sNameClean = sName.toLowerCase();
+    var sParts = sNameClean.split(" ");
+    var sLast = sParts[sParts.length - 1];
+    
+    if (sLast === lastWord) {
+      // If the student typed a first name as well, check if it matches/aligns with the teacher's first name
+      if (nameParts.length > 1 && sParts.length > 1) {
+        var typedFirst = nameParts[0];
+        var dirFirst = sParts[0];
+        if (dirFirst.indexOf(typedFirst) !== -1 || typedFirst.indexOf(dirFirst) !== -1 || levenshteinDistance(typedFirst, dirFirst) <= 1) {
+          substringMatches.push(sName);
+        }
+      } else {
+        // Only last name was typed (e.g. "Janiga"), so it matches
+        substringMatches.push(sName);
+      }
+    } else if (sNameClean.indexOf(strippedName) !== -1 || strippedName.indexOf(sNameClean) !== -1) {
+      substringMatches.push(sName);
+    }
+  }
+  if (substringMatches.length === 1) {
+    Logger.log("Substring resolved teacher: '" + name + "' -> '" + substringMatches[0] + "'");
+    return substringMatches[0];
+  }
+  // 3. Levenshtein distance fuzzy matching fallback
+  var bestMatch = null;
+  var minDistance = 999;
+  for (var sName in staffDirectory) {
+    var sNameClean = sName.toLowerCase();
+    var sParts = sNameClean.split(" ");
+    
+    // First name compatibility check in Step 3
+    if (nameParts.length > 1 && sParts.length > 1) {
+      var typedFirst = nameParts[0].replace(/[^a-z0-9]/g, "");
+      var dirFirst = sParts[0].replace(/[^a-z0-9]/g, "");
+      var isFirstCompat = (dirFirst.indexOf(typedFirst) !== -1 || typedFirst.indexOf(dirFirst) !== -1 || levenshteinDistance(typedFirst, dirFirst) <= 1);
+      if (!isFirstCompat) {
+        continue; // Skip this candidate as first names are incompatible
+      }
+    }
+    
+    var dist = levenshteinDistance(cleanName, sNameClean);
+    if (dist < minDistance) {
+      minDistance = dist;
+      bestMatch = sName;
+    }
+  }
+  
+  var threshold = Math.max(2, Math.floor(cleanName.length * 0.25));
+  if (bestMatch && minDistance <= threshold) {
+    Logger.log("Fuzzy match resolved teacher: '" + name + "' -> '" + bestMatch + "' (distance: " + minDistance + ")");
+    return bestMatch;
+  }
+  
+  return null;
+}
+
+/**
+ * Checks if a student name matches multiple records in Master_Roster (roster collision).
+ */
+function hasRosterCollision(name) {
+  if (!name) return false;
+  var cleanName = name.trim().toLowerCase().replace(/\s+/g, " ");
+  
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var rosterSheet = ss.getSheetByName("Master_Roster");
+  if (!rosterSheet) return false;
+  
+  var data = rosterSheet.getDataRange().getValues();
+  if (data.length <= 1) return false;
+  
+  var headers = data[0];
+  var firstCol = -1;
+  var lastCol = -1;
+  for (var c = 0; c < headers.length; c++) {
+    var h = headers[c].toString().toLowerCase().trim();
+    if (h.indexOf("first") !== -1) firstCol = c;
+    else if (h.indexOf("last") !== -1) lastCol = c;
+  }
+  if (firstCol === -1) firstCol = 0;
+  if (lastCol === -1) lastCol = 1;
+  
+  var matches = 0;
+  for (var r = 1; r < data.length; r++) {
+    var fName = data[r][firstCol] ? data[r][firstCol].toString().trim() : "";
+    var lName = data[r][lastCol] ? data[r][lastCol].toString().trim() : "";
+    var fullName = (fName + " " + lName).trim().toLowerCase().replace(/\s+/g, " ");
+    
+    if (fullName === cleanName) {
+      matches++;
+    }
+  }
+  
+  return matches > 1;
 }
 
 

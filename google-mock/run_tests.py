@@ -296,6 +296,15 @@ mock_digest_js = f"""
 // Ensure CONFIG has debug mode true during tests
 CONFIG.DEBUG_MODE = false; // We set it to false so it hits our mock MailApp.sendEmail
 
+var LockService = {{
+  getDocumentLock: function() {{
+    return {{
+      waitLock: function(ms) {{}},
+      releaseLock: function() {{}}
+    }};
+  }}
+}};
+
 var DriveApp = {{
   getFolderById: function(id) {{
     return {{
@@ -364,7 +373,8 @@ var mockSheets = {{
     ["Last Name", "First Name", "Staff Classification", "Department / Specific Role", "Email"],
     ["Wilson", "Tom", "Teacher", "English", "tom.wilson@copley-fairlawn.org"],
     ["Janiga", "Sarah", "Teacher", "Science", "sarah.janiga@copley-fairlawn.org"],
-    ["Gray", "Amy", "Support Staff", "Counseling", "amy.gray@copley-fairlawn.org"]
+    ["Gray", "Amy", "Support Staff", "Counseling", "amy.gray@copley-fairlawn.org"],
+    ["Custodian", "Joe", "Support Staff", "Custodial", "joe.custodian@copley-fairlawn.org"]
   ],
   "GenYES_Moderation_Queue": [
     ["Timestamp", "Sender", "House", "Target Staff", "Category", "Message", "Anonymous", "Status", "Audited By", "Audit Date", "Feature on TV?"],
@@ -386,18 +396,29 @@ var mockSheets = {{
   ]
 }};
 
+var alertCalls = [];
+var toastCalls = [];
+
 var SpreadsheetApp = {{
   getActiveSpreadsheet: function() {{
     return {{
       getUrl: function() {{ return "https://docs.google.com/spreadsheets/d/mock-sheet-id/edit"; }},
+      toast: function(msg, title, duration) {{
+        toastCalls.push({{msg: msg, title: title}});
+      }},
       getSheetByName: function(name) {{
         if (!mockSheets[name]) return null;
         return {{
           getName: function() {{ return name; }},
+          getLastRow: function() {{ return mockSheets[name].length; }},
+          getLastColumn: function() {{ return mockSheets[name][0] ? mockSheets[name][0].length : 0; }},
           getDataRange: function() {{
             return {{
               getValues: function() {{ return mockSheets[name]; }}
             }};
+          }},
+          deleteRow: function(idx) {{
+            mockSheets[name].splice(idx - 1, 1);
           }}
         }};
       }},
@@ -406,6 +427,8 @@ var SpreadsheetApp = {{
         return sheetNames.map(function(name) {{
           return {{
             getName: function() {{ return name; }},
+            getLastRow: function() {{ return mockSheets[name].length; }},
+            getLastColumn: function() {{ return mockSheets[name][0] ? mockSheets[name][0].length : 0; }},
             getDataRange: function() {{
               return {{
                 getValues: function() {{ return mockSheets[name]; }}
@@ -413,7 +436,43 @@ var SpreadsheetApp = {{
             }}
           }};
         }});
+      }},
+      insertSheet: function(name) {{
+        mockSheets[name] = [];
+        return {{
+          getName: function() {{ return name; }},
+          getLastRow: function() {{ return mockSheets[name].length; }},
+          getLastColumn: function() {{ return 0; }},
+          appendRow: function(row) {{
+            mockSheets[name].push(row);
+          }},
+          getRange: function(row, col, numRows, numCols) {{
+            return {{
+              setFontWeight: function() {{ return this; }},
+              setBackground: function() {{ return this; }},
+              setFontColor: function() {{ return this; }}
+            }};
+          }}
+        }};
       }}
+    }};
+  }},
+  getUi: function() {{
+    return {{
+      createMenu: function() {{
+        var menu = {{
+          addItem: function() {{ return menu; }},
+          addSeparator: function() {{ return menu; }},
+          addToUi: function() {{ return menu; }}
+        }};
+        return menu;
+      }},
+      alert: function(title, msg, buttons) {{
+        alertCalls.push({{title: title, msg: msg}});
+        return "yes";
+      }},
+      ButtonSet: {{ YES_NO: "yes_no" }},
+      Button: {{ YES: "yes", NO: "no", OK: "ok" }}
     }};
   }}
 }};
@@ -435,8 +494,34 @@ var MailApp = {{
 
 function run() {{
   sentEmails = [];
+  alertCalls = [];
+  toastCalls = [];
+  
+  // 1. Run weekly digest
   sendWeeklyDigest();
-  return JSON.stringify(sentEmails);
+  
+  // 2. Mock queue size alert test
+  // Let's add dummy rows to the queue to trigger toast warning in checkQueueSizeAndAlert
+  for (var i = 0; i < 210; i++) {{
+    mockSheets["GenYES_Moderation_Queue"].push([new Date(), "Luke Skywalker", "Sophomores", "Sarah Janiga", "GOAT VSO", "Great!", "No", "Approved", "GenYES Operator", new Date(), "Yes", "Yes"]);
+  }}
+  
+  checkQueueSizeAndAlert();
+  
+  // 3. Test queue archiving
+  var initialQueueSize = mockSheets["GenYES_Moderation_Queue"].length;
+  archiveModerationQueueManual();
+  var finalQueueSize = mockSheets["GenYES_Moderation_Queue"].length;
+  var archiveSize = mockSheets["GenYES_Moderation_Queue_Archive"] ? mockSheets["GenYES_Moderation_Queue_Archive"].length : 0;
+  
+  return JSON.stringify({{
+    emails: sentEmails,
+    toastCalls: toastCalls,
+    alertCalls: alertCalls,
+    initialQueueSize: initialQueueSize,
+    finalQueueSize: finalQueueSize,
+    archiveSize: archiveSize
+  }});
 }}
 """
 
@@ -451,21 +536,38 @@ proc = subprocess.Popen(
 )
 stdout, stderr = proc.communicate(input=full_digest_test_code)
 
-if proc.returncode != 0:
-    print("❌ Compilation or Runtime error in Test Case 3:")
-    print(stderr)
-    exit(1)
-
-emails_sent = json.loads(stdout.strip())
+test_result = json.loads(stdout.strip())
+emails_sent = test_result["emails"]
 print(f"Processed Digests Sent: {len(emails_sent)}")
 
 digest_passed = True
+
+# Verify queue size alert toast call
+toast_calls = test_result.get("toastCalls", [])
+has_queue_warning = any("exceeds" in t.get("msg", "").lower() or "currently contains" in t.get("msg", "").lower() for t in toast_calls)
+if not has_queue_warning:
+    print("❌ checkQueueSizeAndAlert did not trigger toast for large queue size (> 200).")
+    digest_passed = False
+else:
+    print("✅ checkQueueSizeAndAlert toast warning verified!")
+    
+# Verify manual queue archiving
+initial_sz = test_result.get("initialQueueSize", 0)
+final_sz = test_result.get("finalQueueSize", 0)
+archive_sz = test_result.get("archiveSize", 0)
+if final_sz != 1 or archive_sz != 214:
+    print(f"❌ archiveModerationQueueManual failed. Initial: {initial_sz}, Final: {final_sz}, Archive: {archive_sz}")
+    digest_passed = False
+else:
+    print(f"✅ archiveModerationQueueManual verified! (Archived {initial_sz - 1} data rows, active queue reset to 1 header row)")
 tom_wilson_email = None
 sarah_janiga_email = None
 amy_gray_email = None
 frodo_baggins_email = None
 frodo_parent_email = None
 luke_skywalker_email = None
+joe_custodian_email = None
+admin_diagnostic_email = None
 
 for email in emails_sent:
     if email["to"] == "tom.wilson@copley-fairlawn.org":
@@ -480,6 +582,10 @@ for email in emails_sent:
         frodo_parent_email = email
     elif email["to"] == "luke.s@cfcsindians.org":
         luke_skywalker_email = email
+    elif email["to"] == "joe.custodian@copley-fairlawn.org":
+        joe_custodian_email = email
+    elif "debbi.spangler@copley-fairlawn.org" in email["to"]:
+        admin_diagnostic_email = email
 
 # Tom Wilson: Luke Skywalker Active but not logged -> outstanding 1. Is Teacher -> shows warning
 if not tom_wilson_email:
@@ -500,16 +606,16 @@ else:
     else:
         print("✅ Tom Wilson dynamic Slides link button verified!")
 
-# Sarah Janiga: Frodo Baggins Active and logged -> outstanding 0. Is Teacher -> shows all clear
+# Sarah Janiga: Frodo Baggins Active and logged -> outstanding 0. Is Teacher -> MTSS box is skipped/hidden completely
 if not sarah_janiga_email:
     print("❌ Sarah Janiga did not receive weekly digest email.")
     digest_passed = False
 else:
-    if "MTSS Review Status: Clear" not in sarah_janiga_email["htmlBody"]:
-        print("❌ Sarah Janiga digest missing 'MTSS Review Status: Clear' section.")
+    if "MTSS" in sarah_janiga_email["htmlBody"] or "Log Intervention" in sarah_janiga_email["htmlBody"]:
+        print("❌ Sarah Janiga digest contains MTSS section when it should be skipped.")
         digest_passed = False
     else:
-        print("✅ Sarah Janiga dynamic caseload all-clear verified!")
+        print("✅ Sarah Janiga dynamic caseload all-clear (no MTSS section) verified!")
 
 # Amy Gray: Support Staff -> exempt from MTSS -> does not show any warning (neither outstanding nor clear)
 if not amy_gray_email:
@@ -521,6 +627,33 @@ else:
         digest_passed = False
     else:
         print("✅ Amy Gray support classification exemption verified!")
+
+# Joe Custodian: Zero-activity Support Staff -> gets "Culture of Gratitude" card & scoreboard, no dashboard/MTSS
+if not joe_custodian_email:
+    print("❌ Joe Custodian did not receive weekly digest email.")
+    digest_passed = False
+else:
+    html = joe_custodian_email["htmlBody"]
+    if "Culture of Gratitude" not in html or "Send a Shout-Out to a Student" not in html or "Department Standings Scoreboard" not in html:
+        print("❌ Joe Custodian digest missing Culture of Gratitude or scoreboard sections.")
+        digest_passed = False
+    elif "Weekly PBIS Staff Dashboard" in html or "Friday Fan Mail" in html or "MTSS" in html:
+        print("❌ Joe Custodian digest contains active stats or MTSS sections.")
+        digest_passed = False
+    else:
+        print("✅ Joe Custodian zero-activity digest (Culture of Gratitude card and scoreboard) verified!")
+
+# Admin Diagnostic Report check (to Debbi Spangler)
+if not admin_diagnostic_email:
+    print("❌ Admin Diagnostic Report email not sent to configured admin emails.")
+    digest_passed = False
+else:
+    html = admin_diagnostic_email["htmlBody"]
+    if "PBIS Admin Diagnostic Report" not in html or "🔍 System Diagnostics & Warnings" not in html or "Roster Integrity Guide" not in html:
+        print("❌ Admin Diagnostic Report email structure is malformed.")
+        digest_passed = False
+    else:
+        print("✅ Admin Diagnostic Report email verified!")
 
 # Frodo Baggins: Student Digest
 if not frodo_baggins_email:
@@ -616,6 +749,15 @@ print("TEST CASE 4: processShoutoutSubmission & Slides Sync verification")
 print("----------------------------------------------------------------")
 
 mock_slides_and_routing_js = """
+var LockService = {
+  getDocumentLock: function() {
+    return {
+      waitLock: function(ms) {},
+      releaseLock: function() {}
+    };
+  }
+};
+
 var mockSheets = {
   "House_Cup_Totals": [
     ["House Name", "Total Points", "Last Updated"]
@@ -625,7 +767,8 @@ var mockSheets = {
   ],
   "Staff_Directory": [
     ["Last Name", "First Name", "Staff Classification", "Department / Specific Role", "Email"],
-    ["Janiga", "Sarah", "Teacher", "Science", "sarah.janiga@copley-fairlawn.org"]
+    ["Janiga", "Sarah", "Teacher", "Science", "sarah.janiga@copley-fairlawn.org"],
+    ["Smith", "Karen", "Teacher", "Special Ed", "karen.smith@copley-fairlawn.org"]
   ],
   "Master_Roster": [
     ["First Name", "Last Name", "Email", "Grade"],
@@ -815,6 +958,18 @@ function runTest4() {
     "No, keep this praise private between us."
   ], true);
   
+  // Test 6: Student-to-Staff submission targeting "Eric Smith" (should NOT resolve to "Karen Smith")
+  processShoutoutSubmission([
+    "2026-06-10 12:25:00",
+    "frodo.b@cfcsindians.org",
+    "Frodo",
+    "Baggins",
+    "Eric Smith",
+    "GOAT VSO",
+    "Thank you Mr. Smith!",
+    "No"
+  ], false);
+  
   // Set first approved & featured, fourth not featured (Luke Skywalker index 5 now)
   // Format of GenYES queue: Timestamp, Sender, House, Target Staff, Category, Message, Anonymous, Status, Audited By, Audit Date, Feature on TV?, Big Screen Consent
   mockSheets["GenYES_Moderation_Queue"][1][7] = "Approved"; // Frodo (Student VSO needs manual approval)
@@ -894,11 +1049,11 @@ for row in test_4_results["ledger"][1:]:
     elif row[0] == "Juniors":
         juniors_pts = row[1]
 
-if seniors_pts != 2:
-    print(f"❌ Student-to-staff routing score mismatch. Expected Seniors: 2, Got: {seniors_pts}")
+if seniors_pts != 4:
+    print(f"❌ Student-to-staff routing score mismatch. Expected Seniors: 4, Got: {seniors_pts}")
     t4_passed = False
 else:
-    print("✅ Student-to-staff resolved points (2 points to Seniors) verified!")
+    print("✅ Student-to-staff resolved points (4 points to Seniors) verified!")
 
 if juniors_pts != 20:
     print(f"❌ Staff-to-student routing score mismatch. Expected Juniors: 20, Got: {juniors_pts}")
@@ -1017,6 +1172,16 @@ elif consent_no_val != "No":
     t4_passed = False
 else:
     print("✅ Big Screen Consent columns resolved and stored correctly!")
+
+# 7. Eric Smith (no resolution to Karen Smith) Verification
+eric_smith_row = test_4_results["queue"][5]
+target_staff_val = eric_smith_row[3]
+
+if target_staff_val != "Eric Smith":
+    print(f"❌ Mismatch resolution check failed. Expected: Eric Smith, Got: {target_staff_val}")
+    t4_passed = False
+else:
+    print("✅ Target staff name non-resolution (Eric Smith remains Eric Smith, not Karen Smith) verified!")
 
 if t4_passed:
     print("\n✨ TEST CASE 4 PASSED! Routing, slide sync checkboxes, and placeholder logic are perfect.")
